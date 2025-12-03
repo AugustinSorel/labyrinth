@@ -22,13 +22,11 @@
         /// <summary>
         /// Gets the type of the item in the room.
         /// </summary>
-        public async Task<IEnumerable<Type>> ItemTypes()
+        public Task<IEnumerable<Type>> ItemTypes()
         {
-            return await Task.Run(() =>
-            {
-                return _items.Select(item => item.GetType());
-
-            });
+            return Task.FromResult(
+                _items.Select(item => item.GetType())
+            );
         }
 
         /// <summary>
@@ -36,15 +34,19 @@
         /// </summary>
         /// <param name="from">The inventory from which the item is taken. The item is removed from this inventory.</param>
         /// <exception cref="InvalidOperationException">Thrown if the room already contains an item (check with <see cref="HasItem"/>).</exception>
-        public void MoveItemFrom(Inventory from, int nth = 0)
+        public Task<bool> MoveItemFrom(Inventory from, int nth = 0)
         {
             if (!from.HasItems)
             {
-                throw new InvalidOperationException("No item to take from the source inventory");
+                return Task.FromResult(false);
             }
+
             _items.Add(from._items[nth]);
             from._items.RemoveAt(nth);
+
+            return Task.FromResult(true);
         }
+
 
         protected IList<ICollectable> _items = new List<ICollectable>();
     }
