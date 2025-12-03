@@ -6,9 +6,9 @@
     /// <param name="item">Optional initial item in the inventory.</param>
     public abstract class Inventory
     {
-        protected Inventory(ICollectable? item = null) 
+        protected Inventory(ICollectable? item = null)
         {
-            if(item is not null)
+            if (item is not null)
             {
                 _items.Add(item);
             }
@@ -17,12 +17,19 @@
         /// <summary>
         /// True if the room has an items, false otherwise.
         /// </summary>
-        public bool HasItems => _items.Count>0;
+        public bool HasItems => _items.Count > 0;
 
         /// <summary>
         /// Gets the type of the item in the room.
         /// </summary>
-        public IEnumerable<Type> ItemTypes => _items.Select(item => item.GetType());
+        public async Task<IEnumerable<Type>> ItemTypes()
+        {
+            return await Task.Run(() =>
+            {
+                return _items.Select(item => item.GetType());
+
+            });
+        }
 
         /// <summary>
         /// Places an item in the inventory, removing it from another one.
