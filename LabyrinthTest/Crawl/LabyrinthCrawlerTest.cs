@@ -7,8 +7,8 @@ namespace LabyrinthTest.Crawl;
 [TestFixture(Description = "Integration test for the crawler implementation in the labyrinth")]
 public class LabyrinthCrawlerTest
 {
-    private static ICrawler 
-        
+    private static ICrawler
+
         NewCrawlerFor(string ascii_map) =>
         new Labyrinth.Labyrinth(ascii_map).NewCrawler();
 
@@ -228,7 +228,7 @@ public class LabyrinthCrawlerTest
 
     #region Items and doors
     [Test]
-    public void WalkInARoomWithAnItem()
+    public async Task WalkInARoomWithAnItem()
     {
         var test = NewCrawlerFor("""
         +---+
@@ -242,7 +242,7 @@ public class LabyrinthCrawlerTest
         using var all = Assert.EnterMultipleScope();
 
         Assert.That(inventory.HasItems, Is.True);
-        Assert.That(inventory.ItemTypes.First(), Is.EqualTo(typeof(Key)));
+        Assert.That((await inventory.ItemTypes()).First(), Is.EqualTo(typeof(Key)));
     }
 
     [Test]
