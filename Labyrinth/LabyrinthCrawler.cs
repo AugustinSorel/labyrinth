@@ -12,11 +12,9 @@ namespace Labyrinth
 
             public int Y => _y;
 
-            public Tile FacingTile => ProcessFacingTile((x, y, tile) => tile);
-
             Direction ICrawler.Direction => _direction;
 
-            public TileType FacingType => ProcessFacingTile((x, y, tile) => tile switch
+            public TileType FacingTile => ProcessFacingTile((x, y, tile) => tile switch
                         {
                             Outside => TileType.Outside, // Si c'est la tuile singleton Outside
                             Door => TileType.Door,
