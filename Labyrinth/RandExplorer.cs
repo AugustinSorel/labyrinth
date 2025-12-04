@@ -9,7 +9,7 @@ namespace Labyrinth
     {
         private readonly ICrawler _crawler = crawler;
         private readonly IEnumRandomizer<Actions> _rnd = rnd;
-        
+
         public enum Actions
         {
             TurnLeft,
@@ -19,18 +19,20 @@ namespace Labyrinth
         public int GetOut(int n)
         {
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(n, 0, "n must be strictly positive");
-            MyInventory bag = new ();
+            MyInventory bag = new();
 
-            for( ; n > 0 && _crawler.FacingTile is not Outside; n--)
+            // Modification 1 : On vérifie le Type au lieu de l'objet
+            for (; n > 0 && _crawler.FacingTile != TileType.Outside; n--)
             {
                 EventHandler<CrawlingEventArgs>? changeEvent;
 
-                if (_crawler.FacingTile.IsTraversable
+                // Modification 2 : On utilise CanMoveForward au lieu de FacingTile.IsTraversable
+                if (_crawler.CanMoveForward
                     && _rnd.Next() == Actions.Walk)
                 {
                     var roomContent = _crawler.Walk();
 
-                    while(roomContent.HasItems)
+                    while (roomContent.HasItems)
                     {
                         bag.MoveItemFrom(roomContent);
                     }
@@ -41,19 +43,23 @@ namespace Labyrinth
                     _crawler.Direction.TurnLeft();
                     changeEvent = DirectionChanged;
                 }
-                if (_crawler.FacingTile is Door door && door.IsLocked)
+
+                // Modification 3 : Logique de déverrouillage abstraite
+                // Si c'est une porte, on tente de l'ouvrir via le crawler
+                if (_crawler.FacingTile == TileType.Door)
                 {
-                    while(bag.HasItems && !door.Open(bag))
+                    // Le Crawler gère en interne si la porte est déjà ouverte ou non.
+                    // Si elle est fermée, il essaie les clés du sac.
+                    while (bag.HasItems && !_crawler.TryUnlock(bag))
                         ;
                 }
+
                 changeEvent?.Invoke(this, new CrawlingEventArgs(_crawler));
             }
             return n;
         }
 
         public event EventHandler<CrawlingEventArgs>? PositionChanged;
-
         public event EventHandler<CrawlingEventArgs>? DirectionChanged;
     }
-
 }

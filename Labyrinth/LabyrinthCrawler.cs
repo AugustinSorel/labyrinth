@@ -16,8 +16,33 @@ namespace Labyrinth
 
             Direction ICrawler.Direction => _direction;
 
-            public Inventory Walk() => 
-                ProcessFacingTile((facingX, facingY, tile) => 
+            public TileType FacingType => ProcessFacingTile((x, y, tile) => tile switch
+                        {
+                            Outside => TileType.Outside, // Si c'est la tuile singleton Outside
+                            Door => TileType.Door,
+                            Wall => TileType.Wall,
+                            _ => TileType.Empty    // Corridor, Room, etc.
+                        });
+
+            public bool CanMoveForward => ProcessFacingTile((x, y, tile) => tile.IsTraversable);
+
+            public bool TryUnlock(Inventory keyChain)
+            {
+                return ProcessFacingTile((x, y, tile) =>
+                {
+                    // Si ce n'est pas une porte, on ne peut pas déverrouiller
+                    if (tile is not Door door) return false;
+
+                    // Si elle n'est pas verrouillée, c'est un succès immédiat
+                    if (!door.IsLocked) return true;
+
+                    // Sinon, on tente d'ouvrir avec l'inventaire fourni
+                    return door.Open(keyChain);
+                });
+            }
+
+            public Inventory Walk() =>
+                ProcessFacingTile((facingX, facingY, tile) =>
                 {
                     var inventory = tile.Pass();
 
