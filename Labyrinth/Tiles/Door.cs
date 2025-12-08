@@ -35,10 +35,10 @@ namespace Labyrinth.Tiles
             {
                 throw new InvalidOperationException("Door is already unlocked.");
             }
-            LocalInventory.MoveItemFrom(keySource);
+            LocalInventory.TryMoveItemFromAsync(keySource);
             if (LocalInventory.Items.First() != _key)
             {
-                keySource.MoveItemFrom(LocalInventory);
+                keySource.TryMoveItemFromAsync(LocalInventory);
             }
             return IsOpened;
         }
@@ -53,7 +53,7 @@ namespace Labyrinth.Tiles
             {
                 throw new InvalidOperationException("Door is already locked.");
             }
-            whereKeyGoes.MoveItemFrom(LocalInventory);
+            whereKeyGoes.TryMoveItemFromAsync(LocalInventory);
         }
 
         private readonly Key _key;

@@ -9,7 +9,7 @@ namespace Labyrinth
     {
         private readonly ICrawler _crawler = crawler;
         private readonly IEnumRandomizer<Actions> _rnd = rnd;
-        
+
         public enum Actions
         {
             TurnLeft,
@@ -19,9 +19,9 @@ namespace Labyrinth
         public int GetOut(int n)
         {
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(n, 0, "n must be strictly positive");
-            MyInventory bag = new ();
+            MyInventory bag = new();
 
-            for( ; n > 0 && _crawler.FacingTile is not Outside; n--)
+            for (; n > 0 && _crawler.FacingTile is not Outside; n--)
             {
                 EventHandler<CrawlingEventArgs>? changeEvent;
 
@@ -30,9 +30,9 @@ namespace Labyrinth
                 {
                     var roomContent = _crawler.Walk();
 
-                    while(roomContent.HasItems)
+                    while (roomContent.HasItems)
                     {
-                        bag.MoveItemFrom(roomContent);
+                        bag.TryMoveItemFromAsync(roomContent);
                     }
                     changeEvent = PositionChanged;
                 }
@@ -43,7 +43,7 @@ namespace Labyrinth
                 }
                 if (_crawler.FacingTile is Door door && door.IsLocked)
                 {
-                    while(bag.HasItems && !door.Open(bag))
+                    while (bag.HasItems && !door.Open(bag))
                         ;
                 }
                 changeEvent?.Invoke(this, new CrawlingEventArgs(_crawler));

@@ -52,7 +52,7 @@ namespace Labyrinth.Build
         {
             if (unplacedKeys.HasItems && emptyKeyRooms.Count > 0)
             {
-                emptyKeyRooms.Pop().Pass().MoveItemFrom(unplacedKeys);
+                emptyKeyRooms.Pop().Pass().TryMoveItemFromAsync(unplacedKeys);
             }
         }
 
