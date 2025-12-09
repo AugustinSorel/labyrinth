@@ -249,7 +249,7 @@ public class LabyrinthCrawlerTest
     }
 
     [Test]
-    public void WalkUseAWrongKeyToOpenADoor()
+    public async Task WalkUseAWrongKeyToOpenADoor()
     {
         var test = NewCrawlerFor("""
             +---+
@@ -261,14 +261,14 @@ public class LabyrinthCrawlerTest
         var inventory = test.Walk();
         var door = (Door)test.FacingTile;
 
-        Assert.That(door.Open(inventory), Is.False);
+        Assert.That(await door.OpenAsync(inventory), Is.False);
         Assert.That(door.IsLocked, Is.True);
         Assert.That(door.IsTraversable, Is.False);
         Assert.That(inventory.HasItems, Is.True);
     }
 
     [Test]
-    public void WalkUseKeyToOpenADoorAndPass()
+    public async Task WalkUseKeyToOpenADoorAndPass()
     {
         var laby = new Labyrinth.Labyrinth("""
                 +--+
@@ -282,7 +282,7 @@ public class LabyrinthCrawlerTest
         var inventory = test.Walk();
 
         test.Direction.TurnRight();
-        ((Door)test.FacingTile).Open(inventory);
+        await ((Door)test.FacingTile).OpenAsync(inventory);
 
         test.Walk();
 

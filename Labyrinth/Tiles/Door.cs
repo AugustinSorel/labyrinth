@@ -29,16 +29,18 @@ namespace Labyrinth.Tiles
         /// <returns>True if the key opens the door, false otherwise.</returns>
         /// <remarks>The key is removed from the inventory only if it opens the door.</remarks>
         /// <exception cref="InvalidOperationException">The door is already opened (check with <see cref="IsOpened"/>).</exception>"
-        public bool Open(Inventory keySource)
+        public async Task<bool> OpenAsync(Inventory keySource)
         {
             if (IsOpened)
             {
                 throw new InvalidOperationException("Door is already unlocked.");
             }
-            LocalInventory.TryMoveItemFromAsync(keySource);
+
+            await LocalInventory.TryMoveItemFromAsync(keySource);
+
             if (LocalInventory.Items.First() != _key)
             {
-                keySource.TryMoveItemFromAsync(LocalInventory);
+                await keySource.TryMoveItemFromAsync(LocalInventory);
             }
             return IsOpened;
         }
@@ -47,13 +49,13 @@ namespace Labyrinth.Tiles
         /// Lock the door and removes the key.
         /// </summary>
         /// <exception cref="InvalidOperationException">The door is already closed (check with <see cref="IsLocked"/>).</exception>
-        public void LockAndTakeKey(Inventory whereKeyGoes)
+        public async void LockAndTakeKey(Inventory whereKeyGoes)
         {
             if (IsLocked)
             {
                 throw new InvalidOperationException("Door is already locked.");
             }
-            whereKeyGoes.TryMoveItemFromAsync(LocalInventory);
+            await whereKeyGoes.TryMoveItemFromAsync(LocalInventory);
         }
 
         private readonly Key _key;

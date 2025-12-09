@@ -30,7 +30,7 @@ namespace Labyrinth.Build
             var door = new Door();
 
             door.LockAndTakeKey(unplacedKeys);
-            PlaceKey();
+            PlaceKeyAsync();
             return door;
         }
 
@@ -44,15 +44,15 @@ namespace Labyrinth.Build
             var room = new Room();
 
             emptyKeyRooms.Push(room);
-            PlaceKey();
+            PlaceKeyAsync();
             return room;
         }
 
-        private void PlaceKey()
+        private async void PlaceKeyAsync()
         {
             if (unplacedKeys.HasItems && emptyKeyRooms.Count > 0)
             {
-                emptyKeyRooms.Pop().Pass().TryMoveItemFromAsync(unplacedKeys);
+                await emptyKeyRooms.Pop().Pass().TryMoveItemFromAsync(unplacedKeys);
             }
         }
 

@@ -28,12 +28,12 @@ var crawler = labyrinth.NewCrawler();
 var prevX = crawler.X;
 var prevY = crawler.Y;
 var explorer = new RandExplorer(
-    crawler, 
+    crawler,
     new BasicEnumRandomizer<RandExplorer.Actions>()
 );
 
 explorer.DirectionChanged += DrawExplorer;
-explorer.PositionChanged  += (s, e) =>
+explorer.PositionChanged += (s, e) =>
 {
     Console.SetCursorPosition(prevX, prevY);
     Console.Write(' ');
@@ -43,4 +43,4 @@ explorer.PositionChanged  += (s, e) =>
 
 Console.Clear();
 Console.WriteLine(labyrinth);
-explorer.GetOut(1000);
+await explorer.GetOutAsync(1000);

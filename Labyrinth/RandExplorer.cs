@@ -16,7 +16,7 @@ namespace Labyrinth
             Walk
         }
 
-        public int GetOut(int n)
+        public async Task<int> GetOutAsync(int n)
         {
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(n, 0, "n must be strictly positive");
             MyInventory bag = new();
@@ -32,7 +32,7 @@ namespace Labyrinth
 
                     while (roomContent.HasItems)
                     {
-                        bag.TryMoveItemFromAsync(roomContent);
+                        await bag.TryMoveItemFromAsync(roomContent);
                     }
                     changeEvent = PositionChanged;
                 }
@@ -43,7 +43,7 @@ namespace Labyrinth
                 }
                 if (_crawler.FacingTile is Door door && door.IsLocked)
                 {
-                    while (bag.HasItems && !door.Open(bag))
+                    while (bag.HasItems && !await door.OpenAsync(bag))
                         ;
                 }
                 changeEvent?.Invoke(this, new CrawlingEventArgs(_crawler));
