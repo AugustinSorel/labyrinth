@@ -1,4 +1,4 @@
-﻿using Labyrinth.Items;
+using Labyrinth.Items;
 using Labyrinth.Tiles;
 
 namespace Labyrinth.Crawl
@@ -24,9 +24,9 @@ namespace Labyrinth.Crawl
         Direction Direction { get; }
 
         /// <summary>
-        /// Gets the tile in front of the crawler.
+        /// Gets the type of tile in front of the crawler.
         /// </summary>
-        TileType FacingTile { get; }
+        Task<TileType> GetFacingTileTypeAsync();
 
         // NOUVEAU : Comme on n'a plus accès à Tile.IsTraversable, 
         // le crawler doit nous dire si la voie est libre.
@@ -34,12 +34,13 @@ namespace Labyrinth.Crawl
 
         // NOUVEAU : On ne peut plus faire door.Open(bag). 
         // C'est le crawler qui envoie la commande au "serveur".
-        bool TryUnlock(Inventory keyChain);
+        Task<bool> TryUnlockAsync(Inventory keyChain);
 
         /// <summary>
-        /// Pass the tile in front of the crawler and move into it.
+        /// Attempts to walk forward into the tile in front of the crawler.
         /// </summary>
-        /// <returns>An inventory of the collectable items in the place reached.</returns>
-        Inventory Walk();
+        /// <param name="keyChain">The inventory containing keys for unlocking doors.</param>
+        /// <returns>An inventory of the collectable items in the place reached, or null if the operation failed (wall or locked door).</returns>
+        Task<Inventory?> TryWalkAsync(Inventory? keyChain);
     }
 }

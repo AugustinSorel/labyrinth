@@ -1,4 +1,4 @@
-﻿using Labyrinth.Items;
+using Labyrinth.Items;
 
 namespace Labyrinth.Tiles
 {
@@ -44,6 +44,31 @@ namespace Labyrinth.Tiles
         }
 
         /// <summary>
+        /// Opens the door with the provided key asynchronously.
+        /// </summary>
+        /// <param name="keySource">Inventory containing the key to open the door.</param>
+        /// <returns>True if the key opens the door, false otherwise.</returns>
+        /// <remarks>The key is removed from the inventory only if it opens the door.</remarks>
+        /// <exception cref="InvalidOperationException">The door is already opened (check with <see cref="IsOpened"/>).</exception>"
+        public async Task<bool> OpenAsync(Inventory keySource)
+        {
+            if (IsOpened)
+            {
+                throw new InvalidOperationException("Door is already unlocked.");
+            }
+            var moved = await LocalInventory.MoveItemFrom(keySource);
+            if (!moved)
+            {
+                return false;
+            }
+            if (LocalInventory.Items.First() != _key)
+            {
+                await keySource.MoveItemFrom(LocalInventory);
+            }
+            return IsOpened;
+        }
+
+        /// <summary>
         /// Lock the door and removes the key.
         /// </summary>
         /// <exception cref="InvalidOperationException">The door is already closed (check with <see cref="IsLocked"/>).</exception>
@@ -53,7 +78,8 @@ namespace Labyrinth.Tiles
             {
                 throw new InvalidOperationException("Door is already locked.");
             }
-            whereKeyGoes.MoveItemFrom(LocalInventory);
+            // Synchronous version for initialization - MoveItemFrom is async but we use .Result for initialization
+            whereKeyGoes.MoveItemFrom(LocalInventory).Wait();
         }
 
         private readonly Key _key;

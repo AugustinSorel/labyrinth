@@ -1,4 +1,4 @@
-﻿using Labyrinth;
+using Labyrinth;
 using Labyrinth.Crawl;
 using Labyrinth.Sys;
 
@@ -43,4 +43,4 @@ explorer.PositionChanged  += (s, e) =>
 
 Console.Clear();
 Console.WriteLine(labyrinth);
-explorer.GetOut(1000);
+await explorer.GetOutAsync(1000);

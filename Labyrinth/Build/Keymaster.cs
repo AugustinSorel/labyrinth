@@ -1,4 +1,4 @@
-﻿using Labyrinth.Items;
+using Labyrinth.Items;
 using Labyrinth.Tiles;
 
 namespace Labyrinth.Build
@@ -52,7 +52,8 @@ namespace Labyrinth.Build
         {
             if (unplacedKeys.HasItems && emptyKeyRooms.Count > 0)
             {
-                emptyKeyRooms.Pop().Pass().MoveItemFrom(unplacedKeys);
+                // Synchronous version for initialization - MoveItemFrom is async but we use .Wait() for initialization
+                emptyKeyRooms.Pop().Pass().MoveItemFrom(unplacedKeys).Wait();
             }
         }
 
