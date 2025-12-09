@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks; // Nécessaire pour Task
-
-namespace Labyrinth.Items
+﻿namespace Labyrinth.Items
 {
     /// <summary>
     /// Inventory of collectable items for rooms and players.

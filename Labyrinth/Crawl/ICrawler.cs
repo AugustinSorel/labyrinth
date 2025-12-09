@@ -1,5 +1,4 @@
 ﻿using Labyrinth.Items;
-using Labyrinth.Tiles;
 
 namespace Labyrinth.Crawl
 {
@@ -26,12 +25,12 @@ namespace Labyrinth.Crawl
         /// <summary>
         /// Gets the tile in front of the crawler.
         /// </summary>
-        Tile FacingTile { get; }
+        Task<Type> GetFacingTileTypeAsync();
 
         /// <summary>
         /// Pass the tile in front of the crawler and move into it.
         /// </summary>
         /// <returns>An inventory of the collectable items in the place reached.</returns>
-        Inventory Walk();
+        Task<Inventory?> TryWalkAsync(Inventory crawlerInventory);
     }
 }

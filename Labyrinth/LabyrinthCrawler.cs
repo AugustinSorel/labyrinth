@@ -9,21 +9,32 @@ namespace Labyrinth
         private class LabyrinthCrawler(int x, int y, Tile[,] tiles) : ICrawler
         {
             public int X => _x;
-
             public int Y => _y;
-
-            public Tile FacingTile => ProcessFacingTile((x, y, tile) => tile);
 
             Direction ICrawler.Direction => _direction;
 
-            public Inventory Walk() => 
-                ProcessFacingTile((facingX, facingY, tile) => 
-                {
-                    var inventory = tile.Pass();
+            public Task<Type> GetFacingTileTypeAsync() =>
+                ProcessFacingTile((_, _, tile) => Task.FromResult(tile.GetType()));
 
-                    _x = facingX;
-                    _y = facingY;
-                    return inventory;
+            public Task<Inventory?> TryWalkAsync(Inventory crawlerInventory) =>
+                ProcessFacingTile(async (facingX, facingY, tile) =>
+                {
+                    bool canPass = tile.IsTraversable;
+
+                    if (!canPass && tile is Door door)
+                    {
+                        canPass = await door.OpenAsync(crawlerInventory);
+                    }
+
+                    if (canPass)
+                    {
+                        var loot = tile.Pass();
+                        _x = facingX;
+                        _y = facingY;
+                        return loot;
+                    }
+
+                    return null; // Hit a wall or a door we couldn't open
                 });
 
             private bool IsOut(int pos, int dimension) =>

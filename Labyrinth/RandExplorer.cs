@@ -21,39 +21,37 @@ namespace Labyrinth
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(n, 0, "n must be strictly positive");
             MyInventory bag = new();
 
-            for (; n > 0 && _crawler.FacingTile is not Outside; n--)
+            while (n > 0 && await _crawler.GetFacingTileTypeAsync() != typeof(Outside))
             {
-                EventHandler<CrawlingEventArgs>? changeEvent;
+                bool moved = false;
 
-                if (_crawler.FacingTile.IsTraversable
-                    && _rnd.Next() == Actions.Walk)
+                if (_rnd.Next() == Actions.Walk)
                 {
-                    var roomContent = _crawler.Walk();
+                    var roomContent = await _crawler.TryWalkAsync(bag);
 
-                    while (roomContent.HasItems)
+                    if (roomContent is not null)
                     {
-                        await bag.TryMoveItemFromAsync(roomContent);
+                        moved = true;
+                        while (roomContent.HasItems)
+                        {
+                            await bag.TryMoveItemFromAsync(roomContent);
+                        }
+                        PositionChanged?.Invoke(this, new CrawlingEventArgs(_crawler));
                     }
-                    changeEvent = PositionChanged;
                 }
-                else
+
+                if (!moved)
                 {
                     _crawler.Direction.TurnLeft();
-                    changeEvent = DirectionChanged;
+                    DirectionChanged?.Invoke(this, new CrawlingEventArgs(_crawler));
                 }
-                if (_crawler.FacingTile is Door door && door.IsLocked)
-                {
-                    while (bag.HasItems && !await door.OpenAsync(bag))
-                        ;
-                }
-                changeEvent?.Invoke(this, new CrawlingEventArgs(_crawler));
+
+                n--;
             }
             return n;
         }
 
         public event EventHandler<CrawlingEventArgs>? PositionChanged;
-
         public event EventHandler<CrawlingEventArgs>? DirectionChanged;
     }
-
 }
