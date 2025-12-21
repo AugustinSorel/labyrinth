@@ -4,7 +4,7 @@ using Labyrinth.Sys;
 using Moq;
 using static Labyrinth.RandExplorer;
 
-namespace LabyrinthTest;
+namespace LabyrinthTest.Exploration;
 
 public class ExplorerTest
 {
@@ -33,7 +33,7 @@ public class ExplorerTest
         out ExplorerEventsCatcher events,
         params Actions[] actions
     ) {
-        var laby = new Labyrinth.Labyrinth(labyrinth);
+        var laby = new Labyrinth.Maze(labyrinth);
         var mockRnd = new Mock<IEnumRandomizer<Actions>>();
 
         mockRnd.Setup(r => r.Next()).Returns(

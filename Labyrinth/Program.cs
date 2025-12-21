@@ -13,7 +13,7 @@ void DrawExplorer(object? sender, CrawlingEventArgs e)
     Thread.Sleep(500);
 }
 
-var labyrinth = new Labyrinth.Labyrinth("""
+var labyrinth = new Labyrinth.Maze("""
     +--+--------+
     |  /        |
     |  +--+--+  |

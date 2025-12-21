@@ -4,7 +4,7 @@ using Labyrinth.Tiles;
 
 namespace Labyrinth
 {
-    public partial class Labyrinth
+    public partial class Maze
     {
         private class LabyrinthCrawler(int x, int y, Tile[,] tiles) : ICrawler
         {

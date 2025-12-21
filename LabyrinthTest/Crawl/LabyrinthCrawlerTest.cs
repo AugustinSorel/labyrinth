@@ -10,7 +10,7 @@ public class LabyrinthCrawlerTest
     private static ICrawler
 
         NewCrawlerFor(string ascii_map) =>
-        new Labyrinth.Labyrinth(ascii_map).NewCrawler();
+        new Labyrinth.Maze(ascii_map).NewCrawler();
 
     private static async Task AssertThat(ICrawler test, int x, int y, Direction dir, TileType facingTileType)
     {
@@ -55,7 +55,7 @@ public class LabyrinthCrawlerTest
     [Test]
     public void InitWithNoXThrowsArgumentException() =>
         Assert.Throws<ArgumentException>(() =>
-            new Labyrinth.Labyrinth("""
+            new Labyrinth.Maze("""
                 +--+
                 |  |
                 +--+
@@ -276,7 +276,7 @@ public class LabyrinthCrawlerTest
     [Test]
     public async Task WalkUseKeyToOpenADoorAndPass()
     {
-        var laby = new Labyrinth.Labyrinth("""
+        var laby = new Labyrinth.Maze("""
                 +--+
                 |xk|
                 +-/|
