@@ -78,8 +78,6 @@ namespace LabyrinthTest.Crawl
             Assert.That(r1, Is.True);
             Assert.That(r2, Is.True);
         }
-
-
     }
 }   
 

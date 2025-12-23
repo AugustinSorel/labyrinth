@@ -80,6 +80,15 @@ namespace Labyrinth.Exploration
                 }
             }
         }
+
+        public IEnumerable<KnownCell> Cells => _cells.Values;
+
+        public KnownCell? TryGet(int x, int y)
+        {
+            _cells.TryGetValue((x, y), out var cell);
+            return cell;
+        }
+
     }
 }
 
