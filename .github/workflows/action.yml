@@ -12,8 +12,8 @@ env:
   DOTNET_VERSION: '9.0.x' 
 
 jobs:
-  setup:
-    name: setup-${{matrix.os}}
+  restore:
+    name: restore-${{matrix.os}}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -34,12 +34,20 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-nuget-
     
-    - name: Install dependencies
-      run: dotnet restore
+    - name: Restore dependencies
+      run: dotnet restore Labyrinth.sln
+    
+    - name: Upload restored files
+      uses: actions/upload-artifact@v3
+      with:
+        name: restored-${{ matrix.os }}
+        path: |
+          **/obj/
+        retention-days: 1
 
   build:
     name: build-${{matrix.os}}
-    needs: setup
+    needs: restore
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -51,6 +59,11 @@ jobs:
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Download restored files
+      uses: actions/download-artifact@v3
+      with:
+        name: restored-${{ matrix.os }}
     
     - name: Cache NuGet packages
       uses: actions/cache@v3
@@ -62,10 +75,10 @@ jobs:
     
     - name: Build
       run: dotnet build Labyrinth.sln --configuration Release --no-restore --verbosity normal
-  
+
   test:
     name: test-${{matrix.os}}
-    needs: setup
+    needs: restore
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -78,6 +91,11 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
     
+    - name: Download restored files
+      uses: actions/download-artifact@v3
+      with:
+        name: restored-${{ matrix.os }}
+    
     - name: Cache NuGet packages
       uses: actions/cache@v3
       with:
@@ -87,4 +105,4 @@ jobs:
           ${{ runner.os }}-nuget-
     
     - name: Test
-      run: dotnet test Labyrinth.sln --no-restore --verbosity normal
+      run: dotnet test Labyrinth.sln --configuration Release --no-restore --verbosity normal
