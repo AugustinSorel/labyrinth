@@ -366,16 +366,7 @@ namespace Labyrinth
             // If it's a door, try to unlock with our inventory first
             if (facingType == CellType.Door)
             {
-                // Debug logging to help diagnose locked doors
-                try
-                {
-                    var itemTypes = await _inventory.ItemTypes();
-                    Console.WriteLine($"Explorer {_ownerId} at ({curX},{curY}) sees door at ({targetX},{targetY}) - inventory: {string.Join(',', itemTypes.Select(t => t.Name))}");
-                }
-                catch { }
-
                 var unlocked = await _crawler.TryUnlockAsync(_inventory);
-                Console.WriteLine($"Explorer {_ownerId} unlock attempt at ({targetX},{targetY}) => {unlocked}");
                 if (!unlocked)
                 {
                     // can't open the door now
