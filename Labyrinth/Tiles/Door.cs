@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿using Labyrinth.Items;
+=======
+using Labyrinth.Items;
+>>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
 
 namespace Labyrinth.Tiles
 {
@@ -28,17 +32,60 @@ namespace Labyrinth.Tiles
         /// <param name="keySource">Inventory containing the key to open the door.</param>
         /// <returns>True if the key opens the door, false otherwise.</returns>
         /// <remarks>The key is removed from the inventory only if it opens the door.</remarks>
+<<<<<<< HEAD
         /// <exception cref="InvalidOperationException">The door is already opened (check with <see cref="IsOpened"/>).</exception>"
+=======
+>>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
         public bool Open(Inventory keySource)
         {
             if (IsOpened)
             {
+<<<<<<< HEAD
                 throw new InvalidOperationException("Door is already unlocked.");
             }
             LocalInventory.MoveItemFrom(keySource);
             if (LocalInventory.Items.First() != _key)
             {
                 keySource.MoveItemFrom(LocalInventory);
+=======
+                // Already opened -> treat as success
+                return true;
+            }
+            LocalInventory.MoveItemFrom(keySource);
+            var movedKey = LocalInventory.Items.FirstOrDefault();
+            var matches = movedKey is Key;
+            if (!matches)
+            {
+                // move back
+                keySource.MoveItemFrom(LocalInventory).Wait();
+            }
+            return IsOpened;
+        }
+
+        /// <summary>
+        /// Opens the door with the provided key asynchronously.
+        /// </summary>
+        /// <param name="keySource">Inventory containing the key to open the door.</param>
+        /// <returns>True if the key opens the door, false otherwise.</returns>
+        /// <remarks>The key is removed from the inventory only if it opens the door.</remarks>
+        public async Task<bool> OpenAsync(Inventory keySource)
+        {
+            if (IsOpened)
+            {
+                // Already opened -> treat as success
+                return true;
+            }
+            var moved = await LocalInventory.MoveItemFrom(keySource);
+            if (!moved)
+            {
+                return false;
+            }
+            var movedKey = LocalInventory.Items.FirstOrDefault();
+            var matchesAsync = movedKey is Key;
+            if (!matchesAsync)
+            {
+                await keySource.MoveItemFrom(LocalInventory);
+>>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
             }
             return IsOpened;
         }
@@ -53,7 +100,12 @@ namespace Labyrinth.Tiles
             {
                 throw new InvalidOperationException("Door is already locked.");
             }
+<<<<<<< HEAD
             whereKeyGoes.MoveItemFrom(LocalInventory);
+=======
+            // Synchronous version for initialization - MoveItemFrom is async but we use .Result for initialization
+            whereKeyGoes.MoveItemFrom(LocalInventory).Wait();
+>>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
         }
 
         private readonly Key _key;
