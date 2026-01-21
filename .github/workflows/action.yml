@@ -75,6 +75,14 @@ jobs:
     
     - name: Build
       run: dotnet build Labyrinth.sln --configuration Release --no-restore --verbosity normal
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-${{ matrix.os }}
+        path: |
+          **/bin/Release/
+        retention-days: 1
 
   test:
     name: test-${{matrix.os}}
@@ -127,7 +135,7 @@ jobs:
     
     - name:  Publish ${{ matrix.platform.name }}
       run: |
-        dotnet publish Labyrinth.sln \
+        dotnet publish Labyrinth/Labyrinth.csproj \
           --configuration Release \
           --runtime ${{ matrix.platform.os }} \
           --self-contained true \
