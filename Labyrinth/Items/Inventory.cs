@@ -6,6 +6,8 @@ namespace Labyrinth.Items
     /// <param name="item">Optional initial item in the inventory.</param>
     public abstract class Inventory
     {
+        private readonly object _lock = new();
+
         protected Inventory(ICollectable? item = null)
         {
             if (item is not null)
@@ -17,16 +19,28 @@ namespace Labyrinth.Items
         /// <summary>
         /// True if the room has an items, false otherwise.
         /// </summary>
-        public bool HasItems => _items.Count > 0;
+        public bool HasItems
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _items.Count > 0;
+                }
+            }
+        }
 
         /// <summary>
         /// Gets the type of the item in the room.
         /// </summary>
         public Task<IEnumerable<Type>> ItemTypes()
         {
-            return Task.FromResult(
-                _items.Select(item => item.GetType())
-            );
+            lock (_lock)
+            {
+                return Task.FromResult(
+                    _items.Select(item => item.GetType()).ToList().AsEnumerable()
+                );
+            }
         }
 
         /// <summary>
@@ -39,23 +53,59 @@ namespace Labyrinth.Items
         /// <exception cref="InvalidOperationException">Thrown if the room already contains an item (check with <see cref="HasItem"/>).</exception>
         public Task<bool> MoveItemFrom(Inventory from, int nth = 0)
         {
-            if (!from.HasItems)
+            // Lock both inventories to prevent concurrent modifications
+            // Always lock in a consistent order to avoid deadlocks
+            var first = this.GetHashCode() < from.GetHashCode() ? this : from;
+            var second = this.GetHashCode() < from.GetHashCode() ? from : this;
+
+            lock (first._lock)
             {
-                return Task.FromResult(false);
+                lock (second._lock)
+                {
+                    if (!from._items.Any())
+                    {
+                        return Task.FromResult(false);
+                    }
+
+                    // Check if the index is still valid (inventory may have changed)
+                    if (nth < 0 || nth >= from._items.Count)
+                    {
+                        return Task.FromResult(false);
+                    }
+
+                    _items.Add(from._items[nth]);
+                    from._items.RemoveAt(nth);
+
+                    return Task.FromResult(true);
+                }
             }
-
-            // Check if the index is still valid (inventory may have changed)
-            if (nth < 0 || nth >= from._items.Count)
-            {
-                return Task.FromResult(false);
-            }
-
-            _items.Add(from._items[nth]);
-            from._items.RemoveAt(nth);
-
-            return Task.FromResult(true);
         }
 
+        /// <summary>
+        /// Adds an item directly to this inventory in a thread-safe manner.
+        /// </summary>
+        /// <param name="item">The item to add.</param>
+        public void AddItem(ICollectable item)
+        {
+            lock (_lock)
+            {
+                _items.Add(item);
+            }
+        }
+
+        /// <summary>
+        /// Gets the count of items in the inventory.
+        /// </summary>
+        public int Count
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _items.Count;
+                }
+            }
+        }
 
         protected IList<ICollectable> _items = new List<ICollectable>();
     }

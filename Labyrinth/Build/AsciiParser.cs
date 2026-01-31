@@ -6,18 +6,29 @@ namespace Labyrinth.Build
     {
         public Tile[,] Parse(string ascii_map)
         {
-            var lines = ascii_map.Split("\n,\r\n".Split(','), StringSplitOptions.None);
-            var width = lines[0].Length;
-            var tiles = new Tile[width, lines.Length];
+            var lines = ascii_map.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None).ToList();
+            // Remove any leading/trailing empty lines
+            while (lines.Count > 0 && string.IsNullOrEmpty(lines[0])) lines.RemoveAt(0);
+            while (lines.Count > 0 && string.IsNullOrEmpty(lines[^1])) lines.RemoveAt(lines.Count - 1);
+
+            if (lines.Count == 0) return new Tile[0,0];
+
+            int maxWidth = lines.Max(l => l.Length);
+
+            // Pad shorter lines with spaces to ensure rectangular map
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (lines[i].Length < maxWidth)
+                    lines[i] = lines[i].PadRight(maxWidth, ' ');
+            }
+
+            var width = maxWidth;
+            var tiles = new Tile[width, lines.Count];
             
             using var km = new Keymaster();
 
             for (int y = 0; y < tiles.GetLength(1); y++)
             {
-                if (lines[y].Length != width)
-                {
-                    throw new ArgumentException("Invalid map: all lines must have the same length.");
-                }
                 for (int x = 0; x < tiles.GetLength(0); x++)
                 {
                     tiles[x, y] = lines[y][x] switch

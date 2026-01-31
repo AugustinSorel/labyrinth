@@ -7,8 +7,14 @@
     public class MyInventory(ICollectable? item = null) : Inventory(item)
     {
         /// <summary>
-        /// Items in the inventory.
+        /// Items in the inventory. Returns a snapshot for thread-safety.
         /// </summary>
-        public IEnumerable<ICollectable> Items => _items;
+        public IEnumerable<ICollectable> Items => GetItemsSnapshot();
+
+        private IEnumerable<ICollectable> GetItemsSnapshot()
+        {
+            // Return a copy of the items list for thread-safety
+            return _items.ToList();
+        }
     }
 }
