@@ -83,6 +83,26 @@ namespace Labyrinth
 
         private readonly int _ownerId;
 
+        /// <summary>
+        /// Returns true if this explorer has at least one key in inventory.
+        /// </summary>
+        public bool HasKey => _inventory.HasItems;
+
+        /// <summary>
+        /// Returns the number of keys in the inventory.
+        /// </summary>
+        public int KeyCount => _inventory.Count;
+
+        /// <summary>
+        /// Returns true if this explorer has started moving (passed at least one cell).
+        /// </summary>
+        public bool HasStartedMoving { get; private set; }
+
+        /// <summary>
+        /// Returns true if this explorer is blocked (cannot move anywhere).
+        /// </summary>
+        public bool IsBlocked { get; private set; }
+
         public RandExplorer(ICrawler crawler) : this(crawler, null, 0) { }
 
         public RandExplorer(ICrawler crawler, ExplorationMap? map) : this(crawler, map, 0) { }
@@ -215,8 +235,8 @@ namespace Labyrinth
                 else if (curY < doorY) stepY++;
                 else if (curY > doorY) stepY--;
 
-                var moved = await MoveToAsync(stepX, stepY, cancellationToken);
-                if (!moved) break; // stuck, can't reach this door
+                var movedStep = await MoveToAsync(stepX, stepY, cancellationToken);
+                if (!movedStep) break; // stuck, can't reach this door
             }
 
             return false;
@@ -305,6 +325,25 @@ namespace Labyrinth
         }
 
         /// <summary>
+        /// Collects items from a returned inventory into our own inventory.
+        /// Thread-safe operation.
+        /// </summary>
+        private async Task CollectItemsAsync(Inventory? collected)
+        {
+            if (collected == null || !collected.HasItems) return;
+
+            // Merge collected items into our inventory
+            while (collected.HasItems)
+            {
+                var moved = await _inventory.MoveItemFrom(collected, 0);
+                if (!moved) break; // safety - inventory changed unexpectedly
+            }
+
+            // Log current inventory status
+            Console.WriteLine($"[Explorer {_ownerId}] Inventory now has {_inventory.Count} items. HasKey={HasKey}");
+        }
+
+        /// <summary>
         /// Attempts to move the crawler forward one cell in its current facing.
         /// Raises PositionChanged on success and updates the internal inventory.
         /// </summary>
@@ -314,18 +353,18 @@ namespace Labyrinth
             if (!_crawler.CanMoveForward) return false;
 
             var collected = await _crawler.TryWalkAsync(_inventory);
-            if (collected != null)
+            if (collected == null)
             {
-                // Merge collected items into our inventory
-                while (collected.HasItems)
-                {
-                    var moved = await _inventory.MoveItemFrom(collected, 0);
-                    if (!moved) break; // safety
-                }
+                // Walk failed
+                return false;
             }
+
+            // Collect any items from the cell we moved to
+            await CollectItemsAsync(collected);
 
             Map.Mark(_crawler.X, _crawler.Y, CellType.Visited);
             PositionChanged?.Invoke(this, new CrawlingEventArgs(_crawler));
+            HasStartedMoving = true; // Mark as started moving
             return true;
         }
 
@@ -363,18 +402,6 @@ namespace Labyrinth
             };
             Map.Mark(targetX, targetY, facingType);
 
-            // If it's a door, try to unlock with our inventory first
-            if (facingType == CellType.Door)
-            {
-                var unlocked = await _crawler.TryUnlockAsync(_inventory);
-                if (!unlocked)
-                {
-                    // can't open the door now
-                    return false;
-                }
-                // otherwise door unlocked; proceed to step forward
-            }
-
             // If facing outside, consider it the exit and notify
             if (facingType == CellType.Outside)
             {
@@ -382,7 +409,48 @@ namespace Labyrinth
                 return false; // cannot move into outside
             }
 
-            // Try to step forward
+            // If it's a door, loop: try to walk first, if fail try to unlock, repeat
+            if (facingType == CellType.Door)
+            {
+                int maxAttempts = 50;
+                int attempts = 0;
+
+                while (attempts < maxAttempts)
+                {
+                    if (cancellationToken.IsCancellationRequested) return false;
+                    attempts++;
+
+                    // Step 1: Try to walk through (door might be open or opened by another player)
+                    var walked = await TryForceStepForwardAsync(cancellationToken);
+                    if (walked)
+                    {
+                        // Success! Door was open
+                        Map.Mark(targetX, targetY, CellType.Visited);
+                        return true;
+                    }
+
+                    // Step 2: Walk failed, try to unlock with our inventory
+                    var unlocked = await _crawler.TryUnlockAsync(_inventory);
+                    if (unlocked)
+                    {
+                        // Try walking again after unlock
+                        var afterUnlock = await TryForceStepForwardAsync(cancellationToken);
+                        if (afterUnlock)
+                        {
+                            Map.Mark(targetX, targetY, CellType.Visited);
+                            return true;
+                        }
+                    }
+
+                    // Neither worked, wait a bit and retry (maybe another player will open it)
+                    await Task.Delay(100, cancellationToken).ContinueWith(_ => { });
+                }
+
+                // Gave up after max attempts — door remains locked
+                return false;
+            }
+
+            // For non-door tiles, try normal step forward
             var moved = await StepForwardAsync(cancellationToken);
             return moved;
         }
@@ -399,6 +467,40 @@ namespace Labyrinth
                 safety++;
             }
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Attempts to move forward ignoring the crawler's CanMoveForward flag.
+        /// This is used to ask a remote server to attempt the walk (walking=true) even when
+        /// the facing tile is reported as non-traversable (e.g. a Door) because another
+        /// agent may have opened it concurrently.
+        /// </summary>
+        public async Task<bool> TryForceStepForwardAsync(CancellationToken cancellationToken = default)
+        {
+            if (cancellationToken.IsCancellationRequested) return false;
+
+            var prevX = _crawler.X;
+            var prevY = _crawler.Y;
+
+            var collected = await _crawler.TryWalkAsync(_inventory);
+            if (collected != null)
+            {
+                // Check if we actually moved (position changed)
+                var didMove = (_crawler.X != prevX || _crawler.Y != prevY);
+
+                // Collect any items from the cell we moved to
+                await CollectItemsAsync(collected);
+
+                if (didMove)
+                {
+                    Map.Mark(_crawler.X, _crawler.Y, CellType.Visited);
+                    PositionChanged?.Invoke(this, new CrawlingEventArgs(_crawler));
+                    HasStartedMoving = true;
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 >>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
