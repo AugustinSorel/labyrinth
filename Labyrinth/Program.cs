@@ -2,6 +2,15 @@ using Labyrinth;
 using Labyrinth.Crawl;
 using Labyrinth.Sys;
 
+if (args.Length < 2)
+{
+    Console.WriteLine("Usage: labyrinth <server_address> <api_key>");
+    Environment.Exit(1);
+}
+
+Configuration.ServerAddress = args[0];
+Configuration.ApiKey = args[1];
+
 char DirToChar(Direction dir) =>
     "^<v>"[dir.DeltaX * dir.DeltaX + dir.DeltaX + dir.DeltaY + 1];
 
