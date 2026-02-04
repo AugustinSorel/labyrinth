@@ -114,7 +114,14 @@ for (int i = 0; i < ExplorerCount; i++)
 }
 
 // Prepare console
-Console.Clear();
+try
+{
+    Console.Clear();
+}
+catch
+{
+    // Ignore Console.Clear() failures in non-interactive mode
+}
 Console.WriteLine(labyrinth);
 
 using var cts = new CancellationTokenSource();
@@ -179,7 +186,7 @@ for (int i = 0; i < ExplorerCount; i++)
 }
 
 // Wait for all explorers to complete or timeout
-int timeoutMs = 60000; // 60s
+int timeoutMs = 300000; // 300s (5 minutes)
 var all = Task.WhenAll(tasks);
 var completed = await Task.WhenAny(all, Task.Delay(timeoutMs, token));
 
