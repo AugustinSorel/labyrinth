@@ -234,9 +234,12 @@ namespace Labyrinth.Crawl
             try
             {
                 var content = await res.Content.ReadAsStringAsync();
-                Console.WriteLine($"[GetState] Full response: {content}");
-                
+                // Only log if there are items or bag content
                 var dto = JsonSerializer.Deserialize<CrawlerDto>(content, _jsonOptions);
+                if (dto?.Items?.Length > 0 || dto?.Bag?.Length > 0)
+                {
+                    Console.WriteLine($"[Keys] State has items:{dto?.Items?.Length ?? 0} bag:{dto?.Bag?.Length ?? 0}");
+                }
                 return dto;
             }
             catch (Exception ex)
@@ -252,11 +255,23 @@ namespace Labyrinth.Crawl
             var state = await GetStateAsync();
             if (state == null) return TileType.Empty;
             var facing = state.GetFacing() ?? "Empty";
+            
+            // Log the facing tile for debugging (only for non-Room tiles to reduce noise)
+            if (facing != "Room" && facing != "Empty")
+            {
+                Console.WriteLine($"[Debug] Facing tile: '{facing}'");
+            }
+            
             return facing switch
             {
                 "Wall" => TileType.Wall,
                 "Door" => TileType.Door,
                 "Outside" => TileType.Outside,
+                "Exit" => TileType.Outside,
+                "Exterior" => TileType.Outside,
+                "Escape" => TileType.Outside,
+                "Room" => TileType.Empty,
+                "Empty" => TileType.Empty,
                 _ => TileType.Empty,
             };
         }
@@ -336,20 +351,94 @@ namespace Labyrinth.Crawl
 
         public async Task<bool> TryUnlockAsync(Inventory keyChain)
         {
-            // Build payload matching server schema
-            var payload = new[] { new InventoryItemDto { Type = "Key", MoveRequired = true } };
-            var json = JsonSerializer.Serialize(payload, _jsonOptions);
-            var req = new HttpRequestMessage(HttpMethod.Put, $"/crawlers/{_crawlerId}/bag?appKey={Uri.EscapeDataString(_appKey)}");
-            req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-            var res = await _http.SendAsync(req);
-            if (!res.IsSuccessStatusCode)
+            // First, check if we have a key in the bag on the server
+            var state = await GetStateAsync();
+            if (state?.Bag == null || state.Bag.Length == 0)
             {
-                var content = await ReadResponseContentSafeAsync(res);
-                LogError("TryUnlock failed", res, content);
-                return false;
+                // No keys in bag - try to pick up any keys on current tile first
+                if (state?.Items != null && state.Items.Any(i => string.Equals(i.Type, "Key", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await TryPickupKeyAsync();
+                    state = await GetStateAsync();
+                    if (state?.Bag == null || state.Bag.Length == 0)
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
             }
 
-            return true;
+            var dirInt = DirectionToInt(_dir);
+            var prevX = _x;
+            var prevY = _y;
+            var bagCount = state?.Bag?.Length ?? 0;
+            
+            Console.WriteLine($"[Keys] Attempting unlock+walk at ({_x},{_y}) dir={dirInt}, bag={bagCount}");
+            
+            // Strategy: PATCH with BOTH unlocking=true AND walking=true in the same call
+            var unlockAndWalkPayload = new 
+            { 
+                id = _crawlerId, 
+                x = _x, 
+                y = _y, 
+                direction = dirInt, 
+                unlocking = true,
+                walking = true
+            };
+            
+            var req = new HttpRequestMessage(new HttpMethod("PATCH"), $"/crawlers/{_crawlerId}?appKey={Uri.EscapeDataString(_appKey)}");
+            req.Content = JsonContent.Create(unlockAndWalkPayload, options: _jsonOptions);
+            var res = await _http.SendAsync(req);
+            
+            // Check if we moved regardless of status code
+            var newState = await GetStateAsync();
+            if (newState != null)
+            {
+                var newX = newState.GetX() ?? _x;
+                var newY = newState.GetY() ?? _y;
+                
+                if (newX != prevX || newY != prevY)
+                {
+                    Console.WriteLine($"[Keys] SUCCESS! Moved: ({prevX},{prevY}) -> ({newX},{newY})");
+                    _x = newX;
+                    _y = newY;
+                    _dir = ParseDirection(newState.Direction, _dir);
+                    return true;
+                }
+                
+                // Check if key was consumed (door might be open now)
+                var newBagCount = newState?.Bag?.Length ?? 0;
+                if (newBagCount < bagCount)
+                {
+                    Console.WriteLine($"[Keys] Key consumed ({bagCount} -> {newBagCount}), door should be open");
+                    // The door is now open, we need to walk through it
+                    // The caller (MoveToAsync) will try TryForceStepForwardAsync again
+                    return true;
+                }
+            }
+
+            // If unlock+walk didn't work, try just unlocking then let caller walk
+            var unlockReq = new HttpRequestMessage(new HttpMethod("PATCH"), $"/crawlers/{_crawlerId}?appKey={Uri.EscapeDataString(_appKey)}");
+            unlockReq.Content = JsonContent.Create(new { id = _crawlerId, x = _x, y = _y, direction = dirInt, unlocking = true }, options: _jsonOptions);
+            var unlockRes = await _http.SendAsync(unlockReq);
+            
+            if (unlockRes.IsSuccessStatusCode)
+            {
+                // Check if key was used
+                newState = await GetStateAsync();
+                var newBagCount = newState?.Bag?.Length ?? 0;
+                if (newBagCount < bagCount)
+                {
+                    Console.WriteLine($"[Keys] Unlock consumed key ({bagCount} -> {newBagCount})");
+                    return true;
+                }
+            }
+
+            Console.WriteLine($"[Keys] Could not unlock door");
+            return false;
         }
 
         public async Task<Inventory?> TryWalkAsync(Inventory? keyChain)
@@ -370,24 +459,16 @@ namespace Labyrinth.Crawl
             }
 
             // Ask server to walk by sending a full crawler object with walking=true.
-            // Use integer for direction
             var dirInt = DirectionToInt(_dir);
             var payload = new { id = _crawlerId, x = _x, y = _y, direction = dirInt, walking = true };
-            
-            // Log the request body
-            var payloadJson = JsonSerializer.Serialize(payload, _jsonOptions);
-            Console.WriteLine($"[TryWalk] PATCH /crawlers/{_crawlerId} Body: {payloadJson}");
             
             var req = new HttpRequestMessage(new HttpMethod("PATCH"), $"/crawlers/{_crawlerId}?appKey={Uri.EscapeDataString(_appKey)}");
             req.Content = JsonContent.Create(payload, options: _jsonOptions);
             var res = await _http.SendAsync(req);
 
-            // If server returned conflict, check if we moved anyway (another player may have opened door)
+            // If server returned conflict, check if we moved anyway
             if (res.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
-                var content = await ReadResponseContentSafeAsync(res);
-                LogError("TryWalk conflict", res, content);
-
                 // Refresh state to see if position actually changed
                 state = await GetStateAsync();
                 if (state != null)
@@ -398,30 +479,24 @@ namespace Labyrinth.Crawl
                     if (sy.HasValue) _y = sy.Value;
                     _dir = ParseDirection(state.Direction, _dir);
 
-                    // If position changed, walk succeeded despite conflict message
                     if (_x != prevX || _y != prevY)
                     {
-                        // Check if there are items in the new state and try to collect them
-                        return await TryCollectItemsFromCurrentCellAsync();
+                        // Only return newly picked up items, not existing bag contents
+                        return await TryPickupItemsOnTileAsync(state);
                     }
                 }
-
-                return null; // Walk truly failed
+                return null;
             }
 
             if (!res.IsSuccessStatusCode)
             {
-                var content = await ReadResponseContentSafeAsync(res);
-                LogError("TryWalk failed", res, content);
                 return null;
             }
 
-            // Log the full response for debugging
             string? responseContent = null;
             try
             {
                 responseContent = await res.Content.ReadAsStringAsync();
-                Console.WriteLine($"[TryWalk] Response: {responseContent}");
             }
             catch { }
 
@@ -435,7 +510,7 @@ namespace Labyrinth.Crawl
             }
             catch (Exception ex)
             {
-                LogError("Failed to deserialize TryWalk response", null, ex.Message + "; content=" + responseContent);
+                LogError("Failed to deserialize TryWalk response", null, ex.Message);
                 return null;
             }
 
@@ -446,8 +521,139 @@ namespace Labyrinth.Crawl
 
             _x = nx; _y = ny; _dir = ParseDirection(dto.Direction, _dir);
 
-            // After successful walk, try to collect any items on the current cell
-            return await TryCollectItemsFromCurrentCellAsync();
+            // Only return newly picked up items from the tile, not existing bag contents
+            return await TryPickupItemsOnTileAsync(dto);
+        }
+
+        /// <summary>
+        /// Try to pick up items on the current tile (from "items" array in state).
+        /// Returns an inventory with only the newly picked up items.
+        /// </summary>
+        private async Task<Inventory> TryPickupItemsOnTileAsync(CrawlerDto? dto)
+        {
+            var inventory = new MyInventory();
+            
+            if (dto?.Items == null || dto.Items.Length == 0)
+            {
+                return inventory;
+            }
+
+            Console.WriteLine($"[Keys] Found {dto.Items.Length} items on tile at ({_x},{_y})!");
+            
+            foreach (var item in dto.Items)
+            {
+                if (string.Equals(item.Type, "Key", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"[Keys] KEY DETECTED! Attempting pickup...");
+                    var picked = await TryPickupKeyAsync();
+                    if (picked)
+                    {
+                        inventory.AddItem(new Items.Key());
+                        Console.WriteLine($"[Keys] KEY PICKED UP SUCCESSFULLY!");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[Keys] Failed to pick up key");
+                    }
+                }
+            }
+
+            return inventory;
+        }
+
+        /// <summary>
+        /// Try to pick up a key from the current tile.
+        /// </summary>
+        private async Task<bool> TryPickupKeyAsync()
+        {
+            // First refresh state to get current inventory version
+            var state = await GetStateAsync();
+            var currentItems = state?.Items?.Length ?? 0;
+            var currentBag = state?.Bag?.Length ?? 0;
+            
+            // Try different pickup strategies
+            
+            // Strategy 1: PUT with just the type, no move-required
+            var req1 = new HttpRequestMessage(HttpMethod.Put, $"/crawlers/{_crawlerId}/items?appKey={Uri.EscapeDataString(_appKey)}");
+            req1.Content = new StringContent("[{\"type\":\"Key\"}]", Encoding.UTF8, "application/json");
+            var res1 = await _http.SendAsync(req1);
+            
+            if (res1.IsSuccessStatusCode)
+            {
+                var newState = await GetStateAsync();
+                if ((newState?.Bag?.Length ?? 0) > currentBag)
+                {
+                    Console.WriteLine($"[Keys] Pickup succeeded (strategy 1)!");
+                    return true;
+                }
+            }
+
+            // Strategy 2: POST to items endpoint
+            var req2 = new HttpRequestMessage(HttpMethod.Post, $"/crawlers/{_crawlerId}/items?appKey={Uri.EscapeDataString(_appKey)}");
+            req2.Content = new StringContent("[{\"type\":\"Key\"}]", Encoding.UTF8, "application/json");
+            var res2 = await _http.SendAsync(req2);
+            
+            if (res2.IsSuccessStatusCode)
+            {
+                var newState = await GetStateAsync();
+                if ((newState?.Bag?.Length ?? 0) > currentBag)
+                {
+                    Console.WriteLine($"[Keys] Pickup succeeded (strategy 2)!");
+                    return true;
+                }
+            }
+
+            // Strategy 3: DELETE from items (pick up = remove from tile)
+            var req3 = new HttpRequestMessage(HttpMethod.Delete, $"/crawlers/{_crawlerId}/items?appKey={Uri.EscapeDataString(_appKey)}");
+            var res3 = await _http.SendAsync(req3);
+            
+            if (res3.IsSuccessStatusCode)
+            {
+                var newState = await GetStateAsync();
+                if ((newState?.Bag?.Length ?? 0) > currentBag)
+                {
+                    Console.WriteLine($"[Keys] Pickup succeeded (strategy 3)!");
+                    return true;
+                }
+            }
+
+            // Strategy 4: PATCH crawler with bag containing the key
+            var req4 = new HttpRequestMessage(new HttpMethod("PATCH"), $"/crawlers/{_crawlerId}?appKey={Uri.EscapeDataString(_appKey)}");
+            req4.Content = JsonContent.Create(new 
+            { 
+                id = _crawlerId, 
+                x = _x, 
+                y = _y, 
+                direction = DirectionToInt(_dir),
+                bag = new[] { new { type = "Key" } }
+            }, options: _jsonOptions);
+            var res4 = await _http.SendAsync(req4);
+            
+            if (res4.IsSuccessStatusCode)
+            {
+                var newState = await GetStateAsync();
+                if ((newState?.Bag?.Length ?? 0) > currentBag)
+                {
+                    Console.WriteLine($"[Keys] Pickup succeeded (strategy 4)!");
+                    return true;
+                }
+            }
+
+            // Strategy 5: Original with move-required:true
+            var req5 = new HttpRequestMessage(HttpMethod.Put, $"/crawlers/{_crawlerId}/items?appKey={Uri.EscapeDataString(_appKey)}");
+            req5.Content = new StringContent("[{\"type\":\"Key\",\"move-required\":true}]", Encoding.UTF8, "application/json");
+            var res5 = await _http.SendAsync(req5);
+            var content5 = await ReadResponseContentSafeAsync(res5);
+            
+            Console.WriteLine($"[Keys] PUT /items: {res5.StatusCode} - {content5}");
+            
+            if (res5.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[Keys] Pickup succeeded (strategy 5)!");
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -457,46 +663,33 @@ namespace Labyrinth.Crawl
         {
             if (dto == null) return new MyInventory();
 
-            // Check "items" array (items on the tile we walked to)
+            var inv = new MyInventory();
+
             if (dto.Items != null && dto.Items.Length > 0)
             {
-                var inv = new MyInventory();
                 foreach (var it in dto.Items)
                 {
                     if (string.Equals(it.Type, "Key", StringComparison.OrdinalIgnoreCase))
                     {
                         inv.AddItem(new Items.Key());
-                        Console.WriteLine($"[TryWalk] Found key in 'items' array!");
+                        Console.WriteLine($"[Keys] Extracted key from items array");
                     }
-                }
-                if (inv.HasItems)
-                {
-                    Console.WriteLine($"[TryWalk] Collected {inv.Count} items from 'items' array");
-                    return inv;
                 }
             }
 
-            // Check "bag" content (items already in crawler's bag)
             if (dto.Bag != null && dto.Bag.Length > 0)
             {
-                var inv = new MyInventory();
                 foreach (var it in dto.Bag)
                 {
                     if (string.Equals(it.Type, "Key", StringComparison.OrdinalIgnoreCase))
                     {
                         inv.AddItem(new Items.Key());
-                        Console.WriteLine($"[TryWalk] Found key in 'bag' array!");
+                        Console.WriteLine($"[Keys] Extracted key from bag array");
                     }
-                }
-                if (inv.HasItems)
-                {
-                    Console.WriteLine($"[TryWalk] Collected {inv.Count} items from 'bag' array");
-                    return inv;
                 }
             }
 
-            // Return empty inventory (walk succeeded but no items)
-            return new MyInventory();
+            return inv;
         }
 
         /// <summary>
@@ -508,48 +701,41 @@ namespace Labyrinth.Crawl
         }
 
         /// <summary>
-        /// Attempt to collect items from the current cell by sending a PUT request to pick up items.
-        /// This checks for items on the tile and adds them to the crawler's bag.
+        /// Attempt to collect items from the current cell.
         /// </summary>
         private async Task<Inventory> TryCollectItemsFromCurrentCellAsync()
         {
+            var state = await GetStateAsync();
+            if (state == null) return new MyInventory();
+
             var inventory = new MyInventory();
 
-            // First, get the current state to see if there are items on the tile
-            var state = await GetStateAsync();
-            if (state == null) return inventory;
-
-            // Check if there are items in the response
             if (state.Items != null && state.Items.Length > 0)
             {
-                Console.WriteLine($"[Collect] Found {state.Items.Length} items on current tile!");
+                Console.WriteLine($"[Keys] Collecting: {state.Items.Length} items on tile");
                 
-                // Try to pick up each item by adding it to our bag
                 foreach (var item in state.Items)
                 {
                     if (string.Equals(item.Type, "Key", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Send a PUT request to add the item to our bag
-                        var pickupSuccess = await TryPickupItemAsync("Key");
+                        var pickupSuccess = await TryPickupKeyAsync();
                         if (pickupSuccess)
                         {
                             inventory.AddItem(new Items.Key());
-                            Console.WriteLine($"[Collect] Successfully picked up a Key!");
+                            Console.WriteLine($"[Keys] Key collected!");
                         }
                     }
                 }
             }
 
-            // Also check if we already have items in our bag from a previous collection
             if (state.Bag != null && state.Bag.Length > 0)
             {
-                Console.WriteLine($"[Collect] Crawler bag contains {state.Bag.Length} items");
                 foreach (var item in state.Bag)
                 {
                     if (string.Equals(item.Type, "Key", StringComparison.OrdinalIgnoreCase))
                     {
                         inventory.AddItem(new Items.Key());
-                        Console.WriteLine($"[Collect] Key already in bag!");
+                        Console.WriteLine($"[Keys] Key in bag");
                     }
                 }
             }
@@ -558,42 +744,67 @@ namespace Labyrinth.Crawl
         }
 
         /// <summary>
-        /// Try to pick up an item from the current tile by sending a PUT to /crawlers/{id}/bag
+        /// Get items on the current tile by calling GET /crawlers/{id}/items
         /// </summary>
-        private async Task<bool> TryPickupItemAsync(string itemType)
+        private async Task<InventoryItemDto[]?> GetItemsOnCurrentTileAsync()
         {
             try
             {
-                // Send a PUT request to add the item to our bag with move-required = false (picking up)
-                var payload = new[] { new { type = itemType, moveRequired = false } };
-                var json = JsonSerializer.Serialize(payload, _jsonOptions);
+                var res = await _http.GetAsync($"/crawlers/{_crawlerId}/items?appKey={Uri.EscapeDataString(_appKey)}");
                 
-                Console.WriteLine($"[Pickup] PUT /crawlers/{_crawlerId}/bag Body: {json}");
+                if (!res.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                var responseContent = await res.Content.ReadAsStringAsync();
+                var items = JsonSerializer.Deserialize<InventoryItemDto[]>(responseContent, _jsonOptions);
                 
-                var req = new HttpRequestMessage(HttpMethod.Put, $"/crawlers/{_crawlerId}/bag?appKey={Uri.EscapeDataString(_appKey)}");
-                req.Content = new StringContent(json, Encoding.UTF8, "application/json");
-                var res = await _http.SendAsync(req);
-
-                var content = await ReadResponseContentSafeAsync(res);
-                Console.WriteLine($"[Pickup] Response: {res.StatusCode} - {content}");
-
-                return res.IsSuccessStatusCode;
+                if (items != null && items.Length > 0)
+                {
+                    Console.WriteLine($"[Keys] GET /items returned {items.Length} items");
+                }
+                
+                return items;
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[Pickup] Error: {ex.Message}");
-                return false;
+                return null;
             }
+        }
+
+        /// <summary>
+        /// Try to pick up an item from the current tile
+        /// </summary>
+        private async Task<bool> TryPickupItemAsync(string itemType)
+        {
+            return await TryPickupKeyAsync();
         }
 
         public async ValueTask DisposeAsync()
         {
             try
             {
-                await _http.DeleteAsync($"/crawlers/{_crawlerId}?appKey={Uri.EscapeDataString(_appKey)}");
+                Console.WriteLine($"[Cleanup] Deleting crawler {_crawlerId}...");
+                var response = await _http.DeleteAsync($"/crawlers/{_crawlerId}?appKey={Uri.EscapeDataString(_appKey)}");
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"[Cleanup] Crawler {_crawlerId} deleted successfully.");
+                }
+                else
+                {
+                    var content = await ReadResponseContentSafeAsync(response);
+                    Console.WriteLine($"[Cleanup] Failed to delete crawler {_crawlerId}: {response.StatusCode} - {content}");
+                }
             }
-            catch { }
-            _http.Dispose();
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Cleanup] Error deleting crawler {_crawlerId}: {ex.Message}");
+            }
+            finally
+            {
+                _http.Dispose();
+            }
         }
     }
 }
