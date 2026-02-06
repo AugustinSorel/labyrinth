@@ -251,26 +251,53 @@ public class LabyrinthCrawlerTest
     }
 
     [Test]
-    public async Task WalkUseAWrongKeyToOpenADoor()
+    public async Task WalkThroughLockedDoorWithoutKey_ShouldFail()
     {
-        var test = NewCrawlerFor("""
-            +---+
-            |/ k|
-            |k  |
-            |x /|
-            +---+
-            """);
-        var inventory = await test.TryWalkAsync(null);
+        var laby = new Labyrinth.Maze("""
+                +--+
+                |x/|
+                +--+
+                """);
+        var test = laby.NewCrawler();
+        
+        // Face the door to the east
+        test.Direction.TurnRight();
+        
         var facingTileType = await test.GetFacingTileTypeAsync();
-
-        Assert.That(inventory, Is.Not.Null);
         Assert.That(facingTileType, Is.EqualTo(TileType.Door));
         
-        // Try to walk through door with wrong key
-        var walkResult = await test.TryWalkAsync(inventory);
-        Assert.That(walkResult, Is.Null); // Should fail because wrong key
+        // Try to walk through door without a key
+        var walkResult = await test.TryWalkAsync(null);
+        Assert.That(walkResult, Is.Null); // Should fail because no key
+    }
+
+    [Test]
+    public async Task WalkThroughLockedDoorWithKey_ShouldSucceed()
+    {
+        var laby = new Labyrinth.Maze("""
+                +--+
+                |xk|
+                +-/|
+                """);
+        var test = laby.NewCrawler();
         
+        // Pick up the key by turning right and walking
+        test.Direction.TurnRight();
+        var inventory = await test.TryWalkAsync(null);
+        
+        Assert.That(inventory, Is.Not.Null);
         Assert.That(inventory!.HasItems, Is.True);
+        
+        // Now turn right again to face south where the door is
+        test.Direction.TurnRight();
+        
+        var facingTileType = await test.GetFacingTileTypeAsync();
+        Assert.That(facingTileType, Is.EqualTo(TileType.Door));
+        
+        // Try to walk through door with the key
+        var walkResult = await test.TryWalkAsync(inventory);
+        Assert.That(walkResult, Is.Not.Null); // Should succeed with the key
+        Assert.That(inventory.HasItems, Is.False); // Key should be consumed
     }
 
     [Test]
@@ -288,7 +315,7 @@ public class LabyrinthCrawlerTest
         var inventory = await test.TryWalkAsync(null);
 
         test.Direction.TurnRight();
-        ((Door)test.FacingTile).Open(inventory);
+        await test.TryUnlockAsync(inventory!);
         
         // Try to walk through door with key
         var walkResult = await test.TryWalkAsync(inventory);
