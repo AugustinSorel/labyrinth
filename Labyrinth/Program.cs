@@ -46,8 +46,8 @@ void DrawAt(int x, int y, char c)
 string GenerateSimpleMaze()
 {
     // Simple concentric corridors maze with two doors and two key rooms
-return 
-@"  +--+--------+
+    return
+    @"  +--+--------+
     |  /        |
     |  +--+--+  |
     |     |k    |

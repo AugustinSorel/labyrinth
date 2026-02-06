@@ -1,4 +1,4 @@
-using Labyrinth.Items;
+﻿using Labyrinth.Items;
 
 namespace Labyrinth.Tiles
 {
@@ -28,6 +28,7 @@ namespace Labyrinth.Tiles
         /// <param name="keySource">Inventory containing the key to open the door.</param>
         /// <returns>True if the key opens the door, false otherwise.</returns>
         /// <remarks>The key is removed from the inventory only if it opens the door.</remarks>
+        /// <exception cref="InvalidOperationException">The door is already opened (check with <see cref="IsOpened"/>).</exception>"
         public bool Open(Inventory keySource)
         {
             if (IsOpened)
