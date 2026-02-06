@@ -157,6 +157,78 @@ namespace Labyrinth
         }
 
         /// <summary>
+        /// Check if there are any Unknown cells on the map that might be reachable through doors.
+        /// </summary>
+        private bool HasPotentiallyReachableUnknownCells()
+        {
+            if (!Map.TryGet(out var snapshot)) return false;
+
+            var directions = new[] { (0, -1), (1, 0), (0, 1), (-1, 0) };
+
+            // Check cells adjacent to doors - they might lead to unexplored areas
+            var doorCells = snapshot
+                .Where(kvp => kvp.Value == CellType.Door)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var (doorX, doorY) in doorCells)
+            {
+                foreach (var (dx, dy) in directions)
+                {
+                    var nx = doorX + dx;
+                    var ny = doorY + dy;
+                    
+                    var cellType = snapshot.TryGetValue((nx, ny), out var ct) ? ct : CellType.Unknown;
+                    
+                    // If there's an Unknown cell next to a door, there's potential exploration
+                    if (cellType == CellType.Unknown)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Log the current state of exploration for debugging.
+        /// </summary>
+        private void LogExplorationState(string context)
+        {
+            if (!Map.TryGet(out var snapshot)) return;
+            
+            var visitedCount = snapshot.Count(kvp => kvp.Value == CellType.Visited || kvp.Value == CellType.Start);
+            var doorCount = snapshot.Count(kvp => kvp.Value == CellType.Door);
+            var wallCount = snapshot.Count(kvp => kvp.Value == CellType.Wall);
+            var unknownAdjacentToVisited = 0;
+            
+            var directions = new[] { (0, -1), (1, 0), (0, 1), (-1, 0) };
+            var visitedCells = snapshot
+                .Where(kvp => kvp.Value == CellType.Visited || kvp.Value == CellType.Start)
+                .Select(kvp => kvp.Key)
+                .ToList();
+                
+            foreach (var (x, y) in visitedCells)
+            {
+                foreach (var (dx, dy) in directions)
+                {
+                    var nx = x + dx;
+                    var ny = y + dy;
+                    if (_failedCells.Contains((nx, ny))) continue;
+                    
+                    var cellType = snapshot.TryGetValue((nx, ny), out var ct) ? ct : CellType.Unknown;
+                    if (cellType == CellType.Unknown || cellType == CellType.Empty)
+                    {
+                        unknownAdjacentToVisited++;
+                    }
+                }
+            }
+            
+            Console.WriteLine($"[Explorer {_ownerId}] {context}: Visited={visitedCount}, Doors={doorCount}, Walls={wallCount}, UnknownFrontier={unknownAdjacentToVisited}, FailedCells={_failedCells.Count}, HasKey={HasKey}, KeyCount={KeyCount}");
+        }
+
+        /// <summary>
         /// Get all unexplored neighbors of the current position.
         /// </summary>
         private List<(int X, int Y, Direction Dir)> GetUnexploredNeighbors()
@@ -289,7 +361,7 @@ namespace Labyrinth
             int maxIterations = 500000;
             int iterations = 0;
             int noProgressRounds = 0;
-            const int maxNoProgressRounds = 100;
+            const int maxNoProgressRounds = 300; // Increased for better exploration
 
             Map.Mark(_crawler.X, _crawler.Y, CellType.Start);
             _failedCells.Clear(); // Reset failed cells at start
@@ -380,6 +452,15 @@ namespace Labyrinth
                 {
                     var remainingDoors = snapshot.Count(kvp => kvp.Value == CellType.Door);
                     var hasUnexplored = HasUnexploredFrontier();
+                    var hasPotentialUnknown = HasPotentiallyReachableUnknownCells();
+                    
+                    // Check if exit was found (Outside cell detected)
+                    var exitFound = snapshot.Any(kvp => kvp.Value == CellType.Outside);
+                    if (exitFound)
+                    {
+                        Console.WriteLine($"[Explorer {_ownerId}] Exit detected on map. Finishing.");
+                        break;
+                    }
                     
                     if (remainingDoors > 0)
                     {
@@ -409,17 +490,42 @@ namespace Labyrinth
                             if (!madeProgress)
                             {
                                 noProgressRounds++;
-                                await Task.Delay(100, cancellationToken).ContinueWith(_ => { });
+                                await Task.Delay(50, cancellationToken).ContinueWith(_ => { });
                             }
                         }
                         else
                         {
-                            if (noProgressRounds % 20 == 0)
+                            // No keys - try to explore more to find keys
+                            if (hasUnexplored)
                             {
-                                Console.WriteLine($"[Explorer {_ownerId}] No keys, waiting for others... {remainingDoors} doors on map");
+                                var navigated = await NavigateToFrontierAsync(cancellationToken);
+                                if (navigated)
+                                {
+                                    madeProgress = true;
+                                    noProgressRounds = 0;
+                                    continue;
+                                }
                             }
-                            await Task.Delay(200, cancellationToken).ContinueWith(_ => { });
-                            noProgressRounds++;
+                            
+                            // If there are doors with unknown cells behind them, wait for others with keys
+                            if (hasPotentialUnknown && noProgressRounds < maxNoProgressRounds / 2)
+                            {
+                                if (noProgressRounds % 30 == 0)
+                                {
+                                    Console.WriteLine($"[Explorer {_ownerId}] No keys, {remainingDoors} doors remain with unexplored areas behind. Waiting...");
+                                }
+                                await Task.Delay(100, cancellationToken).ContinueWith(_ => { });
+                                noProgressRounds++;
+                            }
+                            else
+                            {
+                                if (noProgressRounds % 20 == 0)
+                                {
+                                    Console.WriteLine($"[Explorer {_ownerId}] No keys, waiting for others... {remainingDoors} doors on map");
+                                }
+                                await Task.Delay(100, cancellationToken).ContinueWith(_ => { });
+                                noProgressRounds++;
+                            }
                         }
                     }
                     else if (hasUnexplored)
@@ -439,6 +545,7 @@ namespace Labyrinth
                     {
                         if (!madeProgress)
                         {
+                            LogExplorationState("Finishing exploration");
                             Console.WriteLine($"[Explorer {_ownerId}] No more doors or unexplored areas. Finishing.");
                             break;
                         }
@@ -632,12 +739,26 @@ namespace Labyrinth
         /// </summary>
         private List<(int X, int Y)>? FindPathTo(int targetX, int targetY)
         {
-            if (!Map.TryGet(out var snapshot)) return null;
+            if (!Map.TryGet(out var snapshot))
+            {
+                Console.WriteLine($"[Explorer {_ownerId}] FindPathTo({targetX},{targetY}): Failed to get map snapshot");
+                return null;
+            }
 
             var start = (_crawler.X, _crawler.Y);
             var target = (targetX, targetY);
 
-            if (start == target) return new List<(int X, int Y)>();
+            Console.WriteLine($"[Explorer {_ownerId}] FindPathTo: from ({start.Item1},{start.Item2}) to ({targetX},{targetY})");
+
+            if (start == target)
+            {
+                Console.WriteLine($"[Explorer {_ownerId}] FindPathTo: Already at target");
+                return new List<(int X, int Y)>();
+            }
+
+            // Log target cell type
+            var targetCellType = snapshot.TryGetValue(target, out var tct) ? tct : CellType.Unknown;
+            Console.WriteLine($"[Explorer {_ownerId}] FindPathTo: Target cell type = {targetCellType}");
 
             var queue = new Queue<(int X, int Y)>();
             var visited = new HashSet<(int X, int Y)>();
@@ -647,9 +768,11 @@ namespace Labyrinth
             visited.Add(start);
 
             var directions = new[] { (0, -1), (1, 0), (0, 1), (-1, 0) };
+            int iterations = 0;
 
             while (queue.Count > 0)
             {
+                iterations++;
                 var current = queue.Dequeue();
 
                 foreach (var (dx, dy) in directions)
@@ -680,6 +803,8 @@ namespace Labyrinth
                             node = parent[node];
                         }
                         path.Reverse();
+                        Console.WriteLine($"[Explorer {_ownerId}] FindPathTo: Found path with {path.Count} steps after {iterations} iterations");
+                        Console.WriteLine($"[Explorer {_ownerId}] FindPathTo: Path = {string.Join(" -> ", path.Select(p => $"({p.X},{p.Y})"))}");
                         return path;
                     }
 
@@ -688,6 +813,20 @@ namespace Labyrinth
                         queue.Enqueue(next);
                     }
                 }
+            }
+
+            // Log why path was not found
+            Console.WriteLine($"[Explorer {_ownerId}] FindPathTo: No path found after {iterations} iterations, visited {visited.Count} cells");
+            
+            // Log cells adjacent to target and their types
+            Console.WriteLine($"[Explorer {_ownerId}] FindPathTo: Cells adjacent to target ({targetX},{targetY}):");
+            foreach (var (dx, dy) in directions)
+            {
+                var adjX = targetX + dx;
+                var adjY = targetY + dy;
+                var adjType = snapshot.TryGetValue((adjX, adjY), out var adjCt) ? adjCt : CellType.Unknown;
+                var wasVisitedByBFS = visited.Contains((adjX, adjY));
+                Console.WriteLine($"[Explorer {_ownerId}]   ({adjX},{adjY}): {adjType}, BFS visited: {wasVisitedByBFS}");
             }
 
             return null;
