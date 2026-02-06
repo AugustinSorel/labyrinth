@@ -1,0 +1,192 @@
+name: Labyrinth Efrei
+
+on:
+  push:  
+  pull_request: 
+    branches: [ master ]
+    paths: 
+    - '**.cs'
+    - '**.csproj'
+
+env:
+  DOTNET_VERSION: '9.0.x' 
+
+jobs:
+  restore: 
+    name: restore-${{matrix.os}}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix: 
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:  
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+    
+    - name: Restore dependencies
+      run: dotnet restore Labyrinth.sln
+    
+    - name: Upload restored files
+      uses: actions/upload-artifact@v4
+      with: 
+        name: restored-${{ matrix.os }}
+        path: |
+          **/obj/
+        retention-days: 1
+
+  build:
+    name: build-${{matrix.os}}
+    needs: restore
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix: 
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v4
+      with: 
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Download restored files
+      uses: actions/download-artifact@v4
+      with: 
+        name: restored-${{ matrix.os }}
+    
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+    
+    - name: Build
+      run: dotnet build Labyrinth.sln --configuration Release --no-restore --verbosity normal
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-${{ matrix.os }}
+        path: |
+          **/bin/Release/
+        retention-days: 1
+
+  test:
+    name: test-${{matrix.os}}
+    needs: restore
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    steps: 
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v4
+      with: 
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Download restored files
+      uses: actions/download-artifact@v4
+      with:
+        name: restored-${{ matrix.os }}
+    
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with: 
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+    
+    - name: Test
+      run: dotnet test Labyrinth.sln --configuration Release --no-restore --verbosity normal
+
+  publish:
+    name: publish-${{matrix.platform.name}}
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: 
+          - { os: 'linux-x64', name: 'linux' }
+          - { os: 'win-x64', name: 'windows' }
+          - { os: 'osx-x64', name: 'macos' }
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Publish CLI ${{ matrix.platform.name }}
+      run: |
+        dotnet publish Labyrinth/Labyrinth.csproj \
+          --configuration Release \
+          --runtime ${{ matrix.platform.os }} \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:PublishTrimmed=true \
+          --output ./release/${{ matrix.platform.name }}/cli
+    
+    - name: Publish API ${{ matrix.platform.name }}
+      run: |
+        dotnet publish Labyrinth.Api/Labyrinth.Api.csproj \
+          --configuration Release \
+          --runtime ${{ matrix.platform.os }} \
+          --self-contained true \
+          -p:PublishSingleFile=true \
+          -p:PublishTrimmed=true \
+          --output ./release/${{ matrix.platform.name }}/api
+    
+    - name: Create archive
+      run: |
+        cd ./release/${{ matrix.platform.name }}
+        if [ "${{ matrix.platform.name }}" == "windows" ]; then
+          zip -r ../../Labyrinth-${{ matrix.platform.name }}.zip *
+        else
+          tar -czf ../../Labyrinth-${{ matrix.platform.name }}.tar.gz *
+        fi
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with: 
+        name: release-${{ matrix.platform.name }}
+        path: |
+          Labyrinth-${{ matrix.platform.name }}.*
+        retention-days: 7
+
+  release:
+    name: release
+    needs: publish
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: release-*
+        merge-multiple: true
+    
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          Labyrinth-*.zip
+          Labyrinth-*.tar.gz
