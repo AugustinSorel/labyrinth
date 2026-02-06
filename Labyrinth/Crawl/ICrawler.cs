@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-﻿using Labyrinth.Items;
-=======
 using Labyrinth.Items;
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
 using Labyrinth.Tiles;
 
 namespace Labyrinth.Crawl
@@ -28,17 +24,6 @@ namespace Labyrinth.Crawl
         Direction Direction { get; }
 
         /// <summary>
-<<<<<<< HEAD
-        /// Gets the tile in front of the crawler.
-        /// </summary>
-        Tile FacingTile { get; }
-
-        /// <summary>
-        /// Pass the tile in front of the crawler and move into it.
-        /// </summary>
-        /// <returns>An inventory of the collectable items in the place reached.</returns>
-        Inventory Walk();
-=======
         /// Gets the type of tile in front of the crawler.
         /// </summary>
         Task<TileType> GetFacingTileTypeAsync();
@@ -67,6 +52,5 @@ namespace Labyrinth.Crawl
         /// Turns the crawler 90 degrees to the left (counter-clockwise).
         /// </summary>
         void TurnLeft();
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
     }
 }

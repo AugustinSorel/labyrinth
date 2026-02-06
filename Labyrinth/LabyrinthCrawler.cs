@@ -4,11 +4,7 @@ using Labyrinth.Tiles;
 
 namespace Labyrinth
 {
-<<<<<<< HEAD
-    public partial class Labyrinth
-=======
     public partial class Maze
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
     {
         private class LabyrinthCrawler(int x, int y, Tile[,] tiles) : ICrawler
         {
@@ -16,15 +12,8 @@ namespace Labyrinth
 
             public int Y => _y;
 
-<<<<<<< HEAD
             public Tile FacingTile => ProcessFacingTile((x, y, tile) => tile);
 
-            Direction ICrawler.Direction => _direction;
-
-            public Inventory Walk() => 
-                ProcessFacingTile((facingX, facingY, tile) => 
-                {
-=======
             Direction ICrawler.Direction => _direction;
 
             public Task<TileType> GetFacingTileTypeAsync() => 
@@ -60,13 +49,13 @@ namespace Labyrinth
             {
                 return await ProcessFacingTileAsync(async (facingX, facingY, tile) =>
                 {
-                    // Si c'est un mur, l'opération échoue
+                    // Si c'est un mur, l'opÃ©ration Ã©choue
                     if (tile is Wall) return null;
 
-                    // Si c'est une porte, vérifier qu'elle peut être traversée
+                    // Si c'est une porte, vÃ©rifier qu'elle peut Ãªtre traversÃ©e
                     if (tile is Door door)
                     {
-                        // Si la porte est verrouillée, essayer de l'ouvrir avec l'inventaire fourni
+                        // Si la porte est verrouillÃ©e, essayer de l'ouvrir avec l'inventaire fourni
                         if (door.IsLocked)
                         {
                             if (keyChain == null) return null;
@@ -75,19 +64,16 @@ namespace Labyrinth
                         }
                     }
 
-                    // Si c'est Outside, l'opération échoue
+                    // Si c'est Outside, l'opÃ©ration Ã©choue
                     if (tile is Outside) return null;
 
-                    // Si c'est une pièce ou un corridor, on récupère l'inventaire
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
+                    // Si c'est une piÃ¨ce ou un corridor, on rÃ©cupÃ¨re l'inventaire
                     var inventory = tile.Pass();
 
                     _x = facingX;
                     _y = facingY;
                     return inventory;
                 });
-<<<<<<< HEAD
-=======
             }
 
             private async Task<T> ProcessFacingTileAsync<T>(Func<int, int, Tile, Task<T>> process)
@@ -103,7 +89,6 @@ namespace Labyrinth
                         : _tiles[facingX, facingY]
                  );
             }
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
 
             private bool IsOut(int pos, int dimension) =>
                 pos < 0 || pos >= _tiles.GetLength(dimension);
@@ -125,16 +110,8 @@ namespace Labyrinth
             private int _x = x;
             private int _y = y;
 
-<<<<<<< HEAD
-            private readonly Direction _direction = Direction.North;
-            private readonly Tile[,] _tiles = tiles;
-        }
-    }
-}
-=======
             private Direction _direction = Direction.North;
             private readonly Tile[,] _tiles = tiles;
         }
     }
 }
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)

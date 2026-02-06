@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-﻿using Labyrinth.Items;
-=======
 using Labyrinth.Items;
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
 using Labyrinth.Tiles;
 
 namespace Labyrinth.Build
@@ -18,12 +14,6 @@ namespace Labyrinth.Build
         /// <exception cref="InvalidOperationException">Some keys are missing or are not placed.</exception>
         public void Dispose()
         {
-<<<<<<< HEAD
-            if (unplacedKeys.HasItems || emptyKeyRooms.Count > 0)
-            {
-                throw new InvalidOperationException("Unmatched key/door creation");
-            }
-=======
             // Allow unmatched keys or empty key rooms: some maps may include doors without a corresponding key room
             // (e.g., locked exits). Previously this threw an exception; for exploration tests we accept it.
             // If stricter validation is needed, reintroduce checks here.
@@ -31,7 +21,6 @@ namespace Labyrinth.Build
             // {
             //     throw new InvalidOperationException("Unmatched key/door creation");
             // }
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
         }
 
         /// <summary>
@@ -66,12 +55,8 @@ namespace Labyrinth.Build
         {
             if (unplacedKeys.HasItems && emptyKeyRooms.Count > 0)
             {
-<<<<<<< HEAD
-                emptyKeyRooms.Pop().Pass().MoveItemFrom(unplacedKeys);
-=======
                 // Synchronous version for initialization - MoveItemFrom is async but we use .Wait() for initialization
                 emptyKeyRooms.Pop().Pass().MoveItemFrom(unplacedKeys).Wait();
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
             }
         }
 

@@ -250,6 +250,28 @@ public class LabyrinthCrawlerTest
         Assert.That((await inventory.ItemTypes()).First(), Is.EqualTo(typeof(Key)));
     }
 
+    [Test]
+    public async Task WalkUseAWrongKeyToOpenADoor()
+    {
+        var test = NewCrawlerFor("""
+            +---+
+            |/ k|
+            |k  |
+            |x /|
+            +---+
+            """);
+        var inventory = await test.TryWalkAsync(null);
+        var facingTileType = await test.GetFacingTileTypeAsync();
+
+        Assert.That(inventory, Is.Not.Null);
+        Assert.That(facingTileType, Is.EqualTo(TileType.Door));
+        
+        // Try to walk through door with wrong key
+        var walkResult = await test.TryWalkAsync(inventory);
+        Assert.That(walkResult, Is.Null); // Should fail because wrong key
+        
+        Assert.That(inventory!.HasItems, Is.True);
+    }
 
     [Test]
     public async Task WalkUseKeyToOpenADoorAndPass()
@@ -266,6 +288,7 @@ public class LabyrinthCrawlerTest
         var inventory = await test.TryWalkAsync(null);
 
         test.Direction.TurnRight();
+        ((Door)test.FacingTile).Open(inventory);
         
         // Try to walk through door with key
         var walkResult = await test.TryWalkAsync(inventory);

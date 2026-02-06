@@ -1,14 +1,10 @@
-﻿using Labyrinth.Crawl;
+using Labyrinth.Crawl;
 using Labyrinth.Tiles;
 using System.Text;
 
 namespace Labyrinth
 {
-<<<<<<< HEAD
-    public partial class Labyrinth
-=======
     public partial class Maze
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
     {
         /// <summary>
         /// Labyrinth with walls, doors and collectable items.
@@ -16,11 +12,7 @@ namespace Labyrinth
         /// <param name="ascii_map">A multiline string with '+', '-' or '|' for walls, '/' for doors, 'k' for key locations and x for starting position.</param>
         /// <exception cref="ArgumentException">Thrown when string argument reveals inconsistent map sizes or characters with no starting position.</exception>
         /// <exception cref="NotSupportedException">Thrown for multiple doors (resp. key locations) before key locations (resp. doors).</exception>
-<<<<<<< HEAD
-        public Labyrinth(string ascii_map)
-=======
         public Maze(string ascii_map)
->>>>>>> c114e44 (changing concurent explorer using dfs algorithm instead of A*)
         {
             Build.AsciiParser parser = new();
 
