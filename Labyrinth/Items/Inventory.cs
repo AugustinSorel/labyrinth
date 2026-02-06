@@ -1,4 +1,4 @@
-namespace Labyrinth.Items
+﻿namespace Labyrinth.Items
 {
     /// <summary>
     /// Inventory of collectable items for rooms and players.

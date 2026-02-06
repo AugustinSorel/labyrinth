@@ -12,6 +12,8 @@ namespace Labyrinth
 
             public int Y => _y;
 
+            public Tile FacingTile => ProcessFacingTile((x, y, tile) => tile);
+
             Direction ICrawler.Direction => _direction;
 
             public Task<TileType> GetFacingTileTypeAsync() => 
@@ -33,10 +35,10 @@ namespace Labyrinth
             {
                 var tile = ProcessFacingTile((x, y, t) => t);
                 
-                // Si ce n'est pas une porte, on ne peut pas dÃ©verrouiller
+                // Si ce n'est pas une porte, on ne peut pas déverrouiller
                 if (tile is not Door door) return false;
 
-                // Si elle n'est pas verrouillÃ©e, c'est un succÃ¨s immÃ©diat
+                // Si elle n'est pas verrouillée, c'est un succès immédiat
                 if (!door.IsLocked) return true;
 
                 // Sinon, on tente d'ouvrir avec l'inventaire fourni
