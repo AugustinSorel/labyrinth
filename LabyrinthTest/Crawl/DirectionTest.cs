@@ -1,4 +1,4 @@
-﻿using Labyrinth.Crawl;
+using Labyrinth.Core;
 
 namespace LabyrinthTest.Crawl;
 

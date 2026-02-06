@@ -7,11 +7,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labyrinth", "Labyrinth\Laby
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabyrinthTest", "LabyrinthTest\LabyrinthTest.csproj", "{90F1D9D9-3423-495B-A4FB-A9209725E4E0}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Application", "Application", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labyrinth.Core", "src\Labyrinth.Core\Labyrinth.Core.csproj", "{8167C418-1C49-49F9-BEF3-C795AAE6D21A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labyrinth.Core", "Labyrinth\Application\Domain\Labyrinth.Core.csproj", "{8167C418-1C49-49F9-BEF3-C795AAE6D21A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labyrinth.Api", "src\Labyrinth.Api\Labyrinth.Api.csproj", "{9363DA62-C05E-43AD-9C0A-1EAACC71231D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Labyrinth.Api", "Labyrinth\Application\WebApi\Labyrinth.Api.csproj", "{9363DA62-C05E-43AD-9C0A-1EAACC71231D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

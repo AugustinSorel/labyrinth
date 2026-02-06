@@ -1,7 +1,7 @@
-using Labyrinth.Crawl;
-using Labyrinth.Items;
-using Labyrinth.Sys;
-using Labyrinth.Tiles;
+using Labyrinth.Core;
+using Labyrinth.ValueObjects;
+using Labyrinth.Utils;
+using Labyrinth.Entities;
 
 namespace Labyrinth
 {

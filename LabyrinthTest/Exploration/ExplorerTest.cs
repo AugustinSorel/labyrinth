@@ -1,6 +1,6 @@
 using Labyrinth;
-using Labyrinth.Crawl;
-using Labyrinth.Sys;
+using Labyrinth.Core;
+using Labyrinth.Utils;
 using Moq;
 using static Labyrinth.RandExplorer;
 

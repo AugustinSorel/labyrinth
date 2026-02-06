@@ -135,7 +135,7 @@ jobs:
     
     - name:  Publish ${{ matrix.platform.name }}
       run: |
-        dotnet publish Labyrinth/Labyrinth.csproj \
+        dotnet publish Labyrinth/Application/WebApi/Labyrinth.Api.csproj \
           --configuration Release \
           --runtime ${{ matrix.platform.os }} \
           --self-contained true \

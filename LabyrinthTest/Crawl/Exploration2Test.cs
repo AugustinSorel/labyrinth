@@ -1,4 +1,4 @@
-﻿using Labyrinth.Exploration;
+using Labyrinth.DomainServices;
 using NUnit.Framework;
 using System.Linq;
 using System.Threading;

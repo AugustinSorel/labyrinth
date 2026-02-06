@@ -1,11 +1,11 @@
-ï»¿using global::Labyrinth.Crawl;
-using global::Labyrinth.Items;
-using global::Labyrinth.Tiles;
-using Labyrinth.Exploration;
+using global::Labyrinth.Core;
+using global::Labyrinth.ValueObjects;
+using global::Labyrinth.Entities;
+using Labyrinth.DomainServices;
 
 namespace Labyrinth
 {
-    namespace Labyrinth.Exploration
+    namespace Labyrinth.DomainServices
     {
         public sealed class ConcurrentExplorer
         {
@@ -31,12 +31,12 @@ namespace Labyrinth
 
             public async Task ExploreAsync(CancellationToken token)
             {
-                // Marquer la position initiale comme visitÃ©e
+                // Marquer la position initiale comme visitée
                 _map.MarkVisited(_crawler.X, _crawler.Y);
 
                 while (!token.IsCancellationRequested)
                 {
-                    // 1. Observer la case situÃ©e devant le crawler
+                    // 1. Observer la case située devant le crawler
                     var facingType = await _crawler.GetFacingTileTypeAsync();
 
                     int fx = _crawler.X + _crawler.Direction.DeltaX;
@@ -44,7 +44,7 @@ namespace Labyrinth
 
                     _map.UpdateCell(fx, fy, ConvertTileType(facingType));
 
-                    // 2. Tentative de dÃ©placement direct
+                    // 2. Tentative de déplacement direct
                     if (_crawler.CanMoveForward)
                     {
                         var newInventory = await _crawler.TryWalkAsync(_inventory);
@@ -56,19 +56,19 @@ namespace Labyrinth
                         }
                     }
 
-                    // 3. Recherche dâ€™une frontiÃ¨re Ã  explorer
+                    // 3. Recherche d’une frontière à explorer
                     var frontier = _map.GetFrontiers()
                                        .OrderBy(c => Distance(c, _crawler.X, _crawler.Y))
                                        .FirstOrDefault(c => _map.TryReserveFrontier(c, _crawlerId));
 
                     if (frontier == null)
                     {
-                        // Plus rien Ã  explorer pour ce crawler
+                        // Plus rien à explorer pour ce crawler
                         await Task.Delay(50, token);
                         continue;
                     }
 
-                    // 4. DÃ©placement optimisÃ© vers la frontiÃ¨re
+                    // 4. Déplacement optimisé vers la frontière
                     await MoveUsingAStar(frontier, token);
                 }
             }
@@ -79,7 +79,7 @@ namespace Labyrinth
                 while ((_crawler.X != target.X || _crawler.Y != target.Y)
                        && !token.IsCancellationRequested)
                 {
-                    // Pour lâ€™instant : simple avance tant que possible
+                    // Pour l’instant : simple avance tant que possible
                     if (_crawler.CanMoveForward)
                     {
                         var inv = await _crawler.TryWalkAsync(_inventory);
@@ -91,7 +91,7 @@ namespace Labyrinth
                         }
                     }
 
-                    // BloquÃ© â†’ on abandonne la cible
+                    // Bloqué ? on abandonne la cible
                     break;
                 }
             }
@@ -123,7 +123,7 @@ namespace Labyrinth
                     if (token.IsCancellationRequested)
                         return;
 
-                    // Ã€ ce stade, on suppose la direction dÃ©jÃ  cohÃ©rente
+                    // À ce stade, on suppose la direction déjà cohérente
                     if (_crawler.CanMoveForward)
                     {
                         var inv = await _crawler.TryWalkAsync(_inventory);

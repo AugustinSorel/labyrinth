@@ -1,5 +1,5 @@
-﻿using Labyrinth.Crawl;
-using Labyrinth.Tiles;
+using Labyrinth.Core;
+using Labyrinth.Entities;
 using System.Text;
 
 namespace Labyrinth
@@ -14,7 +14,7 @@ namespace Labyrinth
         /// <exception cref="NotSupportedException">Thrown for multiple doors (resp. key locations) before key locations (resp. doors).</exception>
         public Maze(string ascii_map)
         {
-            Build.AsciiParser parser = new();
+            Factories.AsciiParser parser = new();
 
             parser.StartPositionFound+= (s, e) => _start = (e.X, e.Y);
             _tiles = parser.Parse(ascii_map);
