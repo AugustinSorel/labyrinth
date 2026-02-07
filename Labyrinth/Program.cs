@@ -1,111 +1,100 @@
 ﻿using Labyrinth;
 using Labyrinth.Crawl;
 using Labyrinth.Exploration;
-using Labyrinth.Sys;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Diagnostics;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-object consoleLock = new();
-
 char OwnerChar(int ownerId) => (ownerId <= 9 && ownerId >= 1) ? (char)('0' + ownerId) : 'X';
 
-void SafeSetCursor(int left, int top)
+string RenderMap(ExplorationMap map, Dictionary<int, (int X, int Y)> explorerPositions)
 {
-    if (left < 0 || top < 0) return;
-    try
-    {
-        if (left < Console.BufferWidth && top < Console.BufferHeight)
-            Console.SetCursorPosition(left, top);
-    }
-    catch
-    {
-        // ignore failures when console not available or too small
-    }
-}
+    if (!map.TryGet(out var snapshot)) return "";
 
-void DrawAt(int x, int y, char c)
-{
-    lock (consoleLock)
+    int minX = int.MaxValue, maxX = int.MinValue;
+    int minY = int.MaxValue, maxY = int.MinValue;
+
+    foreach (var kvp in snapshot)
     {
-        try
+        if (kvp.Key.X < minX) minX = kvp.Key.X;
+        if (kvp.Key.X > maxX) maxX = kvp.Key.X;
+        if (kvp.Key.Y < minY) minY = kvp.Key.Y;
+        if (kvp.Key.Y > maxY) maxY = kvp.Key.Y;
+    }
+
+    if (minX > maxX || minY > maxY) return "";
+
+    var sb = new StringBuilder();
+
+    for (int y = minY; y <= maxY; y++)
+    {
+        for (int x = minX; x <= maxX; x++)
         {
-            SafeSetCursor(x, y);
-            Console.Write(c);
-            SafeSetCursor(0, 0);
+            bool isExplorer = false;
+            foreach (var exp in explorerPositions)
+            {
+                if (exp.Value.X == x && exp.Value.Y == y)
+                {
+                    sb.Append(OwnerChar(exp.Key));
+                    isExplorer = true;
+                    break;
+                }
+            }
+
+            if (!isExplorer)
+            {
+                var cellType = snapshot.TryGetValue((x, y), out var ct) ? ct : CellType.Unknown;
+                sb.Append(cellType switch
+                {
+                    CellType.Visited => '.',
+                    CellType.Start => 'S',
+                    CellType.Wall => '#',
+                    CellType.Door => '/',
+                    CellType.Outside => 'O',
+                    CellType.Empty => ' ',
+                    _ => '?'
+                });
+            }
         }
-        catch
-        {
-            // ignore out of range cursor positions
-        }
+        sb.AppendLine();
     }
+
+    return sb.ToString();
 }
 
-string GenerateSimpleMaze()
-{
-    // Simple concentric corridors maze with two doors and two key rooms
-    return
-    @"  +--+--------+
-    |  /        |
-    |  +--+--+  |
-    |     |k    |
-    +--+  |  +--+
-       |k  x    |
-    +  +-------/|
-    |           |
-    +-----------+";
-}
-
-// Support passing app key as command line argument for parallel runs
 var appKeyFromArgs = args.Length > 0 ? args[0] : null;
-
-// Ask the user whether to generate a maze or use the built-in one
-Console.Write("Request server to generate a new labyrinth? (y = request server, enter = send provided map to server): ");
-var answer = Console.ReadLine();
-var ascii = (answer?.Trim().ToLowerInvariant() == "y") ? GenerateSimpleMaze() : @"+--+--------+
-|  /        |
-|  +--+--+  |
-|     |k    |
-+--+  |  +--+
-   |k  x    |
-+  +-------/|
-|           |
-+-----------+";
-
-// Build a local labyrinth preview (for display only)
-var labyrinth = new Labyrinth.Maze(ascii);
 
 var map = new ExplorationMap();
 
 const int ExplorerCount = 3;
-var explorers = new List<RandExplorer>();
+var explorers = new List<BfsExplorer>();
 var tasks = new List<Task>();
+var explorerPositions = new Dictionary<int, (int X, int Y)>();
 
-// Remote only: decide remote parameters using environment variables or command line
 var useRemote = (Environment.GetEnvironmentVariable("LAB_USE_REMOTE") ?? "false").ToLowerInvariant() == "true";
 var appKey = appKeyFromArgs ?? Environment.GetEnvironmentVariable("LAB_APP_KEY") ?? "D98E5988-58E3-4BCE-B050-46E1903E6777";
 var baseUrl = Environment.GetEnvironmentVariable("LAB_BASE_URL") ?? "https://labyrinth.syllab.com";
 
 if (!useRemote)
 {
-    Console.WriteLine("This program requires remote crawlers. Set environment variable LAB_USE_REMOTE=true and provide LAB_APP_KEY.");
+    Console.WriteLine("Set LAB_USE_REMOTE=true and LAB_APP_KEY to run.");
     return;
 }
 
 if (string.IsNullOrWhiteSpace(appKey))
 {
-    Console.WriteLine("LAB_USE_REMOTE=true but LAB_APP_KEY is not set. Please set LAB_APP_KEY and retry.");
+    Console.WriteLine("LAB_APP_KEY is not set.");
     return;
 }
 
-Console.WriteLine($"Using API Key: {appKey[..8]}...");
+Console.WriteLine("Creating crawlers...");
 
 List<ApiCrawler> remoteCrawlersToDispose = new();
 List<ICrawler> crawlers = new();
 
-// create remote crawlers
 for (int i = 0; i < ExplorerCount; i++)
 {
     var api = await Labyrinth.Crawl.ApiCrawler.CreateAsync(baseUrl, appKey!, null);
@@ -113,123 +102,82 @@ for (int i = 0; i < ExplorerCount; i++)
     remoteCrawlersToDispose.Add(api);
 }
 
-// Prepare console
-try
-{
-    Console.Clear();
-}
-catch
-{
-    // Ignore Console.Clear() failures in non-interactive mode
-}
-Console.WriteLine(labyrinth);
+Console.WriteLine($"Starting exploration with {ExplorerCount} explorers...");
 
 using var cts = new CancellationTokenSource();
 var token = cts.Token;
 
-// Track if exit was found
 bool exitFound = false;
-int exitExplorerOwner = 0;
-int exitX = 0, exitY = 0;
+int exitOwnerId = 0;
 
-// Subscribe to exit found on the shared map
 map.ExitFound += (s, e) =>
 {
     exitFound = true;
-    exitExplorerOwner = e.OwnerId;
-    exitX = e.ExitX;
-    exitY = e.ExitY;
-    lock (consoleLock)
-    {
-        DrawAt(e.ExitX, e.ExitY, 'E');
-        SafeSetCursor(0, labyrinth.ToString().Split('\n').Length + 2);
-        Console.WriteLine($"Exit found by explorer {e.OwnerId} at ({e.ExitX},{e.ExitY})");
-    }
+    exitOwnerId = e.OwnerId;
     cts.Cancel();
 };
 
-// Keep track of previous positions per owner to erase
-var prevPos = new Dictionary<int, (int X, int Y)>();
+var stopwatch = Stopwatch.StartNew();
 
 for (int i = 0; i < ExplorerCount; i++)
 {
     var ownerId = i + 1;
     var crawler = crawlers[i];
-    var explorer = new RandExplorer(crawler, map, ownerId);
+    var explorer = new BfsExplorer(crawler, map, ownerId);
     explorers.Add(explorer);
 
-    // initial draw
-    prevPos[ownerId] = (crawler.X, crawler.Y);
-    DrawAt(crawler.X, crawler.Y, OwnerChar(ownerId));
+    explorerPositions[ownerId] = (crawler.X, crawler.Y);
 
     explorer.PositionChanged += (s, e) =>
     {
-        // erase previous
-        var prev = prevPos[ownerId];
-        DrawAt(prev.X, prev.Y, ' ');
-
-        // draw new
-        DrawAt(e.X, e.Y, OwnerChar(ownerId));
-        prevPos[ownerId] = (e.X, e.Y);
-
-        // tiny delay for visibility
-        Thread.Sleep(30);
+        explorerPositions[ownerId] = (e.X, e.Y);
     };
 
-    explorer.DirectionChanged += (s, e) =>
-    {
-        // optional: update orientation marker; keep as owner char for clarity
-    };
-
-    // Start explorer run in background, pass cancellation token
     tasks.Add(Task.Run(async () => await explorer.RunAsync(token)));
 }
 
-// Wait for all explorers to complete or timeout
-int timeoutMs = 300000; // 300s (5 minutes)
+int timeoutMs = 300000;
 var all = Task.WhenAll(tasks);
-var completed = await Task.WhenAny(all, Task.Delay(timeoutMs, token));
+await Task.WhenAny(all, Task.Delay(timeoutMs, token));
 
-if (completed == all && !token.IsCancellationRequested)
+stopwatch.Stop();
+
+Console.Clear();
+Console.WriteLine("═══════════════════════════════════════════");
+Console.WriteLine("           EXPLORATION RESULTS             ");
+Console.WriteLine("═══════════════════════════════════════════");
+Console.WriteLine();
+
+Console.WriteLine(RenderMap(map, explorerPositions));
+
+Console.WriteLine("═══════════════════════════════════════════");
+
+if (exitFound)
 {
-    SafeSetCursor(0, labyrinth.ToString().Split('\n').Length + 1);
-    Console.WriteLine("Exploration complete.");
-}
-else if (token.IsCancellationRequested)
-{
-    SafeSetCursor(0, labyrinth.ToString().Split('\n').Length + 1);
-    Console.WriteLine("Exploration stopped: exit found.");
+    Console.WriteLine($"  ✓ EXIT FOUND by explorer {exitOwnerId}!");
 }
 else
 {
-    SafeSetCursor(0, labyrinth.ToString().Split('\n').Length + 1);
-    Console.WriteLine("Timeout reached.");
+    Console.WriteLine("  ✗ Exploration finished (no exit found)");
 }
 
-// Print final map snapshot
-if (map.TryGet(out var snapshot))
+Console.WriteLine($"  ⏱ Time: {stopwatch.Elapsed.TotalSeconds:F2} seconds");
+Console.WriteLine($"  👥 Explorers: {ExplorerCount}");
+
+if (map.TryGet(out var finalSnapshot))
 {
-    Console.WriteLine("\nDiscovered map snapshot:\n");
-    Console.WriteLine(map.ToString());
+    var visited = finalSnapshot.Count(kvp => kvp.Value == CellType.Visited || kvp.Value == CellType.Start);
+    var walls = finalSnapshot.Count(kvp => kvp.Value == CellType.Wall);
+    var doors = finalSnapshot.Count(kvp => kvp.Value == CellType.Door);
+    Console.WriteLine($"  📊 Cells visited: {visited} | Walls: {walls} | Doors remaining: {doors}");
 }
 
-// Always cleanup remote crawlers at the end
-Console.WriteLine("\nSuppression des crawlers...");
+Console.WriteLine("═══════════════════════════════════════════");
+
 foreach (var rc in remoteCrawlersToDispose)
 {
     try { await rc.DisposeAsync(); } catch { }
 }
-Console.WriteLine("Crawlers supprimés.");
 
-Console.WriteLine("Press any key to exit...");
-try
-{
-    if (!Console.IsInputRedirected)
-    {
-        Console.ReadKey();
-    }
-}
-catch
-{
-    // ignore when console input not available
-}
+Console.WriteLine("\nPress any key to exit...");
+try { if (!Console.IsInputRedirected) Console.ReadKey(); } catch { }

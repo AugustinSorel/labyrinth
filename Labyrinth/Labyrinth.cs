@@ -18,14 +18,6 @@ namespace Labyrinth
 
             parser.StartPositionFound+= (s, e) => _start = (e.X, e.Y);
             _tiles = parser.Parse(ascii_map);
-            if (_tiles.GetLength(0) < 3 || _tiles.GetLength(1) < 3)
-            {
-                throw new ArgumentException("Labyrinth must be at least 3x3");
-            }
-            if (_start == (-1, -1))
-            {
-                throw new ArgumentException("Labyrinth must have at least one starting position marked with x");
-            }
         }
 
         /// <summary>
