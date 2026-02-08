@@ -18,7 +18,7 @@ namespace LabyrinthTest.Integration
 +--+
 """;
             var maze = new Labyrinth.Maze(map);
-            var explorer = new RandExplorer(maze.NewCrawler());
+            var explorer = new BfsExplorer(maze.NewCrawler());
 
             var tcs = new TaskCompletionSource<bool>();
             explorer.Map.ExitFound += (s, e) => tcs.TrySetResult(true);
@@ -41,7 +41,7 @@ namespace LabyrinthTest.Integration
 +--+
 """;
             var maze = new Labyrinth.Maze(map);
-            var explorer = new RandExplorer(maze.NewCrawler());
+            var explorer = new BfsExplorer(maze.NewCrawler());
 
             var found = false;
             explorer.Map.ExitFound += (s, e) => found = true;

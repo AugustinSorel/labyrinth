@@ -16,7 +16,7 @@ public class FrontierManagerTest
 +---+
 """;
         var maze = new Labyrinth.Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         // explorer will have Map with start marked
         explorer.Map.Mark(explorer.Map.TryGet(out var snap) ? 0 : 0, 0, CellType.Start);
 

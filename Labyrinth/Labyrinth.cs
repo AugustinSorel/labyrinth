@@ -18,6 +18,11 @@ namespace Labyrinth
 
             parser.StartPositionFound+= (s, e) => _start = (e.X, e.Y);
             _tiles = parser.Parse(ascii_map);
+            
+            if (_start.X == -1 || _start.Y == -1)
+            {
+                throw new ArgumentException("Map must contain a starting position marked with 'x'.", nameof(ascii_map));
+            }
         }
 
         /// <summary>

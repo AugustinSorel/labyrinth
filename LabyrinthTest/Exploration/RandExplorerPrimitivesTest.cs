@@ -9,7 +9,7 @@ public class RandExplorerPrimitivesTest
 {
     private class ExplorerEventsCatcher
     {
-        public ExplorerEventsCatcher(RandExplorer explorer)
+        public ExplorerEventsCatcher(BfsExplorer explorer)
         {
             explorer.PositionChanged  += (s, e) => CatchEvent(ref _positionChangedCount , e);
             explorer.DirectionChanged += (s, e) => CatchEvent(ref _directionChangedCount, e);
@@ -36,7 +36,7 @@ public class RandExplorerPrimitivesTest
             +-+
             """);
         var crawler = laby.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         var events = new ExplorerEventsCatcher(explorer);
 
         var result = await explorer.StepForwardAsync();
@@ -54,7 +54,7 @@ public class RandExplorerPrimitivesTest
             +---+
             """);
         var crawler = laby.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         var events = new ExplorerEventsCatcher(explorer);
 
         // Turn the crawler to face the open corridor on the right
@@ -75,7 +75,7 @@ public class RandExplorerPrimitivesTest
             +-----+
             """);
         var crawler = laby.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
 
         Assert.ThrowsAsync<ArgumentException>(async () => await explorer.MoveToAsync(crawler.X + 2, crawler.Y));
     }
@@ -90,7 +90,7 @@ public class RandExplorerPrimitivesTest
             +---+
             """);
         var crawler = laby.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         var events = new ExplorerEventsCatcher(explorer);
 
         var targetX = crawler.X - 1; // move left (west)
