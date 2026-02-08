@@ -32,7 +32,7 @@ public class RandExplorerDFSTest
 """;
         var laby = new Labyrinth.Maze(map);
         var crawler = laby.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
 
         // mark start cell
         explorer.Map.Mark(crawler.X, crawler.Y, CellType.Start);
@@ -67,7 +67,7 @@ public class RandExplorerDFSTest
 """;
         var laby = new Labyrinth.Maze(map);
         var crawler = laby.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
 
         explorer.Map.Mark(crawler.X, crawler.Y, CellType.Start);
 

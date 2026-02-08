@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace LabyrinthTest.Exploration;
 
-[TestFixture(Description = "Unit tests for RandExplorer DFS with doors and keys")]
+[TestFixture(Description = "Unit tests for BfsExplorer DFS with doors and keys")]
 public class RandExplorerDoorsKeysTest
 {
     #region HasKey and KeyCount
@@ -17,7 +17,7 @@ public class RandExplorerDoorsKeysTest
 +---+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         Assert.That(explorer.HasKey, Is.False);
         Assert.That(explorer.KeyCount, Is.EqualTo(0));
@@ -34,7 +34,7 @@ public class RandExplorerDoorsKeysTest
 """;
         var maze = new Maze(map);
         var crawler = maze.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         
         // Turn right to face the key room, then step forward
         crawler.TurnRight();
@@ -57,7 +57,7 @@ public class RandExplorerDoorsKeysTest
 +-------+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         // Run full exploration with timeout
         using var cts = new CancellationTokenSource(5000);
@@ -79,7 +79,7 @@ public class RandExplorerDoorsKeysTest
 +---+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         Assert.That(explorer.HasStartedMoving, Is.False);
     }
@@ -94,7 +94,7 @@ public class RandExplorerDoorsKeysTest
 """;
         var maze = new Maze(map);
         var crawler = maze.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         
         // Turn right to face the empty cell, then step
         crawler.TurnRight();
@@ -115,7 +115,7 @@ public class RandExplorerDoorsKeysTest
 +--+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         var tcs = new TaskCompletionSource<bool>();
         explorer.Map.ExitFound += (s, e) => tcs.TrySetResult(true);
@@ -138,7 +138,7 @@ public class RandExplorerDoorsKeysTest
 +--+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         var exitFound = false;
         explorer.Map.ExitFound += (s, e) => exitFound = true;
@@ -159,7 +159,7 @@ public class RandExplorerDoorsKeysTest
 """;
         var maze = new Maze(map);
         var crawler = maze.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         
         // Turn right to face the door
         crawler.TurnRight();
@@ -187,7 +187,7 @@ public class RandExplorerDoorsKeysTest
 +-----+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         // Run exploration
         int safety = 0;
@@ -215,7 +215,7 @@ public class RandExplorerDoorsKeysTest
 """;
         var maze = new Maze(map);
         var crawler = maze.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         
         var positionChangedCount = 0;
         explorer.PositionChanged += (s, e) => positionChangedCount++;
@@ -238,7 +238,7 @@ public class RandExplorerDoorsKeysTest
 +---+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         var directionChangedCount = 0;
         explorer.DirectionChanged += (s, e) => directionChangedCount++;
@@ -267,7 +267,7 @@ public class RandExplorerDoorsKeysTest
 +-------+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         using var cts = new CancellationTokenSource();
         
@@ -305,7 +305,7 @@ public class RandExplorerDoorsKeysTest
 """;
         var maze = new Maze(map);
         var crawler = maze.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         
         var initialY = crawler.Y;
         
@@ -326,7 +326,7 @@ public class RandExplorerDoorsKeysTest
 """;
         var maze = new Maze(map);
         var crawler = maze.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         
         // Facing north which is a wall
         var result = await explorer.StepForwardAsync();
@@ -346,7 +346,7 @@ public class RandExplorerDoorsKeysTest
 """;
         var maze = new Maze(map);
         var crawler = maze.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         
         // Move east
         var result = await explorer.MoveToAsync(2, 1);
@@ -366,7 +366,7 @@ public class RandExplorerDoorsKeysTest
 """;
         var maze = new Maze(map);
         var crawler = maze.NewCrawler();
-        var explorer = new RandExplorer(crawler);
+        var explorer = new BfsExplorer(crawler);
         
         // Try to move to non-adjacent cell (2 steps away)
         Assert.ThrowsAsync<ArgumentException>(async () =>
@@ -387,7 +387,7 @@ public class RandExplorerDoorsKeysTest
 +--+
 """;
         var maze = new Maze(map);
-        var explorer = new RandExplorer(maze.NewCrawler());
+        var explorer = new BfsExplorer(maze.NewCrawler());
         
         var exitFound = false;
         explorer.Map.ExitFound += (s, e) => exitFound = true;

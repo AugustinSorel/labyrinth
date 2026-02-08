@@ -8,7 +8,7 @@ public class ExplorerTest
 {
     private class ExplorerEventsCatcher
     {
-        public ExplorerEventsCatcher(RandExplorer explorer)
+        public ExplorerEventsCatcher(BfsExplorer explorer)
         {
             explorer.PositionChanged  += (s, e) => CatchEvent(ref _positionChangedCount , e);
             explorer.DirectionChanged += (s, e) => CatchEvent(ref _directionChangedCount, e);
@@ -34,14 +34,14 @@ public class ExplorerTest
             |x|
             +-+
             """);
-        var explorer = new RandExplorer(laby.NewCrawler());
+        var explorer = new BfsExplorer(laby.NewCrawler());
         var events = new ExplorerEventsCatcher(explorer);
 
-        // Créer une tâche qui s'exécute pour un temps limité
+        // Crï¿½er une tï¿½che qui s'exï¿½cute pour un temps limitï¿½
         var runTask = Task.Run(async () => await explorer.RunAsync());
         await Task.Delay(500); // Laisser l'explorateur tourner pendant 500ms
 
-        // Vérifier que l'explorateur a tourné (mais pas bougé)
+        // Vï¿½rifier que l'explorateur a tournï¿½ (mais pas bougï¿½)
         Assert.That(events.DirectionChangedCount, Is.GreaterThan(0));
         Assert.That(events.PositionChangedCount, Is.EqualTo(0));
     }
@@ -54,13 +54,13 @@ public class ExplorerTest
             |x  |
             +---+
             """);
-        var explorer = new RandExplorer(laby.NewCrawler());
+        var explorer = new BfsExplorer(laby.NewCrawler());
         var events = new ExplorerEventsCatcher(explorer);
 
         var runTask = Task.Run(async () => await explorer.RunAsync());
         await Task.Delay(500);
 
-        // Vérifier que l'explorateur s'est déplacé
+        // Vï¿½rifier que l'explorateur s'est dï¿½placï¿½
         Assert.That(events.PositionChangedCount, Is.GreaterThan(0));
     }
 
@@ -72,13 +72,13 @@ public class ExplorerTest
             |x    |
             +-----+
             """);
-        var explorer = new RandExplorer(laby.NewCrawler());
+        var explorer = new BfsExplorer(laby.NewCrawler());
         var events = new ExplorerEventsCatcher(explorer);
 
         var runTask = Task.Run(async () => await explorer.RunAsync());
         await Task.Delay(1000);
 
-        // Vérifier que les événements sont levés
+        // Vï¿½rifier que les ï¿½vï¿½nements sont levï¿½s
         Assert.That(events.PositionChangedCount + events.DirectionChangedCount, Is.GreaterThan(0));
     }
 }
